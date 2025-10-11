@@ -73,13 +73,12 @@ Your task: analyze raw or visual school schedules (that may include half session
 **⚙️ Rules:**
 1.  **Sessions:**
     *   There are always 5 sessions per day, numbered 1–5.
-    *   Each session = 80 minutes (two halves × 40 min).
-    *   Generate 5 session rows max, even if the source has more halves.
+    *   If you see Arabic days (أحد, إثنين), you MUST read the schedule from RIGHT to LEFT.
+    *   Generate 5 session rows max.
 
 2.  **Full vs. Half Sessions:**
-    *   If both halves of an 80-minute session are the same subject → write the subject name **only once** (e.g., \`Bio\`).
-    *   If the two 40-minute halves have different subjects → write them with a slash (e.g., \`Bio / CAP\`).
-    *   **Never** repeat the same subject twice in a row for a single session (e.g., not \`Bio / Bio\`, but just \`Bio\`).
+    *   If an 80-minute session block contains two different 40-minute subjects (e.g., two different subject names in the same time slot), write them with a slash (e.g., \`Bio / CAP\`).
+    *   If an 80-minute session block contains the same subject repeated (e.g., "Bio" in both halves), write the subject name **only once** (e.g., \`Bio\`). **NEVER** write "Bio / Bio".
 
 3.  **Breaks:**
     *   **Break 1** comes after session 2.
@@ -87,8 +86,8 @@ Your task: analyze raw or visual school schedules (that may include half session
     *   Always include these as rows in the output. For break rows, the 'session' field should be "Break 1" or "Break 2", the 'time' field should be empty, and all day fields should be empty strings.
 
 4.  **Leaving Early:**
-    *   If the final session (session 5) is only a half session (40 minutes) and students leave afterward, write it like this: **“½ [Subject] + Leave School”**. For example: “½ PE + Leave School”.
-    *   If the fifth session on Thursday is completely free/empty, you **must** write **"Leave School"** in that slot.
+    *   If the final session (session 5) is only a half session (40 minutes) and students leave afterward, write it like this: **“½ [Subject] + Leave School”**.
+    *   If the final session of any day is completely free/empty, you **must** write **"Leave School"** in that slot.
 
 5.  **Optional Subjects:**
     *   If a slot shows a choice between subjects (e.g., French or German), write them with a slash: **“F / G”**.
