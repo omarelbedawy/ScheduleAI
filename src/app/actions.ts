@@ -18,7 +18,7 @@ export async function analyzeScheduleAction(
     console.error('Error analyzing schedule:', e);
     // Return a structured error that the client can display
     return {
-      schedule: '',
+      schedule: [],
       errors: 'An unexpected error occurred while analyzing the schedule. The AI model might be unavailable or the image format could be unsupported. Please try again later.'
     };
   }

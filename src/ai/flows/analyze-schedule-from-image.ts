@@ -22,11 +22,21 @@ export type AnalyzeScheduleFromImageInput = z.infer<
   typeof AnalyzeScheduleFromImageInputSchema
 >;
 
+const ScheduleRowSchema = z.object({
+  session: z.string().describe('The session number or "Break 1" / "Break 2".'),
+  time: z.string().describe('The time slot for the session.'),
+  sunday: z.string().describe('Subject on Sunday.'),
+  monday: z.string().describe('Subject on Monday.'),
+  tuesday: z.string().describe('Subject on Tuesday.'),
+  wednesday: z.string().describe('Subject on Wednesday.'),
+  thursday: z.string().describe('Subject on Thursday.'),
+});
+
 const AnalyzeScheduleFromImageOutputSchema = z.object({
   schedule: z
-    .string()
+    .array(ScheduleRowSchema)
     .describe(
-      'The extracted schedule in a structured, easily readable format, with clear delineation of days and class times.'
+      'An array of objects representing the schedule, with each object being a row.'
     ),
   errors: z
     .string()
@@ -35,6 +45,7 @@ const AnalyzeScheduleFromImageOutputSchema = z.object({
       'Any errors or ambiguities found in the schedule, or empty string if no errors found.'
     ),
 });
+
 export type AnalyzeScheduleFromImageOutput = z.infer<
   typeof AnalyzeScheduleFromImageOutputSchema
 >;
@@ -50,7 +61,7 @@ const analyzeScheduleFromImagePrompt = ai.definePrompt({
   input: {schema: AnalyzeScheduleFromImageInputSchema},
   output: {schema: AnalyzeScheduleFromImageOutputSchema},
   prompt: `You are an intelligent timetable parser.
-Your task: analyze raw or visual school schedules (that may include half sessions, full sessions, and breaks) and convert them into a clean, standardized table format.
+Your task: analyze raw or visual school schedules (that may include half sessions, full sessions, and breaks) and convert them into a structured JSON format.
 
 **Schedule Image to Analyze:**
 {{media url=scheduleImage}}
@@ -63,7 +74,7 @@ Your task: analyze raw or visual school schedules (that may include half session
 1.  **Sessions:**
     *   There are always 5 sessions per day, numbered 1–5.
     *   Each session = 80 minutes (two halves × 40 min).
-    *   Write 5 sessions max, even if the source has more halves.
+    *   Generate 5 session rows max, even if the source has more halves.
 
 2.  **Full vs. Half Sessions:**
     *   If both halves of an 80-minute session are the same subject → write the subject name **only once** (e.g., \`Bio\`).
@@ -73,7 +84,7 @@ Your task: analyze raw or visual school schedules (that may include half session
 3.  **Breaks:**
     *   **Break 1** comes after session 2.
     *   **Break 2** comes after session 4.
-    *   Always include these as rows in the table, labeled **“Break 1”** and **“Break 2”**.
+    *   Always include these as rows in the output. For break rows, the 'session' field should be "Break 1" or "Break 2", the 'time' field should be empty, and all day fields should be empty strings.
 
 4.  **Leaving Early:**
     *   If the final session is only a half session (40 minutes) and students leave afterward, write it like this: **“½ [Subject] + Leave School”**. For example: “½ PE + Leave School”.
@@ -88,22 +99,23 @@ Your task: analyze raw or visual school schedules (that may include half session
     *   Arabic, EN, Bio, CH, PH, MATH, MEC, CITZ, ACTV, ADV, CAP, REL, F, G, PE.
     *   Use the codes exactly as they appear in the source image if they match this list.
 
-8.  **Output Format (Strictly Markdown Table):**
-    *   You **MUST** use the following Markdown table structure.
-
-| Session | Time        | Sunday | Monday | Tuesday | Wednesday | Thursday |
-| :------ | :---------- | :----- | :----- | :------ | :-------- | :------- |
-| 1       | 7:45–9:05   | ...    | ...    | ...     | ...       | ...      |
-| 2       | 9:05–10:25  | ...    | ...    | ...     | ...       | ...      |
-|         | **Break 1** |        |        |         |           |          |
-| 3       | 10:45–12:05 | ...    | ...    | ...     | ...       | ...      |
-| 4       | 12:05–13:25 | ...    | ...    | ...     | ...       | ...      |
-|         | **Break 2** |        |        |         |           |          |
-| 5       | 13:45–15:00 | ...    | ...    | ...     | ...       | ...      |
-
+8.  **Output Format (Strictly JSON):**
+    *   You **MUST** produce a JSON array of objects in the \`schedule\` field.
+    *   Each object represents a row in the schedule.
+    *   The structure for each row object must be:
+        \`{ "session": "...", "time": "...", "sunday": "...", "monday": "...", "tuesday": "...", "wednesday": "...", "thursday": "..." }\`
+    *   Here is the data for the first two sessions and the first break. Complete the rest of the schedule based on the image.
+        \`[
+          { "session": "1", "time": "7:45–9:05", "sunday": "...", "monday": "...", "tuesday": "...", "wednesday": "...", "thursday": "..." },
+          { "session": "2", "time": "9:05–10:25", "sunday": "...", "monday": "...", "tuesday": "...", "wednesday": "...", "thursday": "..." },
+          { "session": "Break 1", "time": "", "sunday": "", "monday": "", "tuesday": "", "wednesday": "", "thursday": "" },
+          { "session": "3", "time": "10:45–12:05", "sunday": "...", "monday": "...", "tuesday": "...", "wednesday": "...", "thursday": "..." },
+          { "session": "4", "time": "12:05–13:25", "sunday": "...", "monday": "...", "tuesday": "...", "wednesday": "...", "thursday": "..." },
+          { "session": "Break 2", "time": "", "sunday": "", "monday": "", "tuesday": "", "wednesday": "", "thursday": "" },
+          { "session": "5", "time": "13:45–15:00", "sunday": "...", "monday": "...", "tuesday": "...", "wednesday": "...", "thursday": "..." }
+        ]\`
 
 **✅ Important "Don'ts":**
-*   **Do not** merge cells vertically. Each session is its own row.
 *   **Do not** include teacher names.
 *   **Do not** repeat identical subjects for a full session (use the subject name only once).
 *   Keep capitalization consistent with the subject codes provided.
@@ -111,7 +123,7 @@ Your task: analyze raw or visual school schedules (that may include half session
 
 ---
 
-Produce **only** the Markdown table in the \`schedule\` field of the output. If you cannot parse the schedule, explain why in the \`errors\` field.`,
+Produce **only** the JSON array in the \`schedule\` field of the output. If you cannot parse the schedule, explain why in the \`errors\` field.`,
 });
 
 const analyzeScheduleFromImageFlow = ai.defineFlow(

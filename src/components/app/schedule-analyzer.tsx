@@ -31,6 +31,7 @@ import { Progress } from "@/components/ui/progress";
 import { useToast } from "@/hooks/use-toast";
 import { cn } from "@/lib/utils";
 import Image from "next/image";
+import { ScheduleTable } from "./schedule-table";
 
 type AnalysisState = "idle" | "previewing" | "loading" | "displaying";
 
@@ -102,11 +103,11 @@ export function ScheduleAnalyzer() {
       const base64Image = await toBase64(file);
       const analysisResult = await analyzeScheduleAction({ scheduleImage: base64Image });
       setResult(analysisResult);
-      if (!analysisResult.schedule && !analysisResult.errors) {
+      if (!analysisResult.schedule?.length && !analysisResult.errors) {
         throw new Error("The AI failed to return a valid response.");
       }
       setState("displaying");
-      if (!analysisResult.schedule && analysisResult.errors) {
+      if (!analysisResult.schedule?.length && analysisResult.errors) {
         toast({
           title: "Analysis Failed",
           description: analysisResult.errors,
@@ -127,7 +128,11 @@ export function ScheduleAnalyzer() {
 
   const onCopy = () => {
     if (!result?.schedule) return;
-    navigator.clipboard.writeText(result.schedule);
+    // A simple text representation for copying
+    const textToCopy = result.schedule
+      .map(row => `${row.session.padEnd(10)} | ${row.time.padEnd(12)} | ${row.sunday} | ${row.monday} | ${row.tuesday} | ${row.wednesday} | ${row.thursday}`)
+      .join('\n');
+    navigator.clipboard.writeText(textToCopy);
     setIsCopied(true);
     setTimeout(() => setIsCopied(false), 2000);
   };
@@ -267,7 +272,7 @@ function ResultState({ result, onCopy, isCopied, onReset }: {
           <div>
             <CardTitle>Analyzed Schedule</CardTitle>
             <CardDescription>
-              Your schedule is ready to copy and paste.
+              Your structured schedule is ready.
             </CardDescription>
           </div>
           <Button onClick={onCopy} variant="secondary" className="w-28">
@@ -288,11 +293,13 @@ function ResultState({ result, onCopy, isCopied, onReset }: {
             <AlertDescription>{result.errors}</AlertDescription>
           </Alert>
         )}
-        <div className="rounded-md border bg-muted p-4">
-          <pre className="font-code text-sm text-muted-foreground whitespace-pre-wrap">
-            {result.schedule || "The AI could not extract a schedule from the image."}
-          </pre>
-        </div>
+        {(result.schedule && result.schedule.length > 0) ? (
+          <ScheduleTable scheduleData={result.schedule} />
+        ) : (
+          <div className="rounded-md border bg-muted p-4">
+            <p className="text-center text-muted-foreground">The AI could not extract a schedule from the image.</p>
+          </div>
+        )}
       </CardContent>
       <CardFooter>
         <Button onClick={onReset} variant="outline">
