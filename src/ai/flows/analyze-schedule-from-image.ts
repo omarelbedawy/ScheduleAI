@@ -61,7 +61,7 @@ const analyzeScheduleFromImagePrompt = ai.definePrompt({
   input: {schema: AnalyzeScheduleFromImageInputSchema},
   output: {schema: AnalyzeScheduleFromImageOutputSchema},
   prompt: `You are an intelligent timetable parser.
-Your task: analyze raw or visual school schedules (that may include half sessions, full sessions, and breaks) and convert them into a structured JSON format.
+Your task: analyze raw or visual school schedules (that may include half sessions, full sessions, and breaks) and convert them into a structured JSON format. Pay close attention to schedules that might be in a right-to-left language like Arabic.
 
 **Schedule Image to Analyze:**
 {{media url=scheduleImage}}
@@ -87,7 +87,8 @@ Your task: analyze raw or visual school schedules (that may include half session
     *   Always include these as rows in the output. For break rows, the 'session' field should be "Break 1" or "Break 2", the 'time' field should be empty, and all day fields should be empty strings.
 
 4.  **Leaving Early:**
-    *   If the final session is only a half session (40 minutes) and students leave afterward, write it like this: **“½ [Subject] + Leave School”**. For example: “½ PE + Leave School”.
+    *   If the final session (session 5) is only a half session (40 minutes) and students leave afterward, write it like this: **“½ [Subject] + Leave School”**. For example: “½ PE + Leave School”.
+    *   If the fifth session on Thursday is completely free/empty, you **must** write **"Leave School"** in that slot.
 
 5.  **Optional Subjects:**
     *   If a slot shows a choice between subjects (e.g., French or German), write them with a slash: **“F / G”**.
@@ -96,7 +97,7 @@ Your task: analyze raw or visual school schedules (that may include half session
     *   If a session is completely empty or unscheduled, use a dash (—).
 
 7.  **Subject Codes (Use Only These):**
-    *   Arabic, EN, Bio, CH, PH, MATH, MEC, CITZ, ACTV, ADV, CAP, REL, F, G, PE, CS, Geo.
+    *   Arabic, EN, Bio, CH, PH, MATH, MEC, CITZ, ACTV, ADV, CAP, REL, F, G, PE, CS, Geo, SOCIAL.
     *   Use the codes exactly as they appear in the source image if they match this list.
 
 8.  **Output Format (Strictly JSON):**

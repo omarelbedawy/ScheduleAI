@@ -47,22 +47,32 @@ export function ScheduleTable({ scheduleData }: { scheduleData: ScheduleData }) 
                 <div
                   key={`${rowIndex}-${day}`}
                   className={cn(
-                    "flex min-h-[4rem] items-center justify-center bg-card p-2 transition-transform duration-200 ease-in-out hover:scale-105 hover:shadow-lg hover:z-10",
-                    { "bg-primary/10": subject !== "—" && subject !== "" }
+                    "flex flex-col min-h-[4rem] bg-card p-0",
+                    { "bg-primary/10": subject !== "—" && subject !== "" && !isSplit },
+                    "group"
                   )}
                 >
                   {isSplit ? (
-                    <div className="flex flex-col items-center justify-center">
-                      <span>{subject.split('/')[0].trim()}</span>
-                      <span className="text-xs text-muted-foreground">/</span>
-                      <span>{subject.split('/')[1].trim()}</span>
-                    </div>
+                    <>
+                      <div className="flex-1 flex items-center justify-center p-1 border-b border-border/50 transition-transform duration-200 ease-in-out group-hover:scale-105 hover:!scale-110 hover:shadow-lg hover:z-10 bg-primary/5">
+                        <span className="font-semibold text-foreground">
+                          {subject.split('/')[0].trim()}
+                        </span>
+                      </div>
+                      <div className="flex-1 flex items-center justify-center p-1 transition-transform duration-200 ease-in-out group-hover:scale-105 hover:!scale-110 hover:shadow-lg hover:z-10 bg-primary/5">
+                        <span className="font-semibold text-foreground">
+                          {subject.split('/')[1].trim()}
+                        </span>
+                      </div>
+                    </>
                   ) : (
-                    <span className={cn(
-                      subject === "—" || subject === "" ? "text-muted-foreground/50" : "font-semibold text-foreground"
-                    )}>
-                      {subject}
-                    </span>
+                    <div className="flex-1 flex items-center justify-center p-2 transition-transform duration-200 ease-in-out hover:scale-105 hover:shadow-lg hover:z-10">
+                      <span className={cn(
+                        subject === "—" || subject === "" ? "text-muted-foreground/50" : "font-semibold text-foreground"
+                      )}>
+                        {subject}
+                      </span>
+                    </div>
                   )}
                 </div>
               );
