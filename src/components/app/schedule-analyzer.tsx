@@ -348,7 +348,7 @@ function ResultState({ result, editableSchedule, onCopy, isCopied, onReset, isEd
         <Button onClick={onReset} variant="outline">
           Analyze Another
         </Button>
-      </ArrowSplit>
+      </CardFooter>
     </Card>
   );
 }
