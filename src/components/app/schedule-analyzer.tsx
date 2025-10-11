@@ -1,7 +1,7 @@
 "use client";
 
 import type { AnalyzeScheduleFromImageOutput } from "@/ai/flows/analyze-schedule-from-image";
-import { ChangeEvent, DragEvent, useRef, useState } from "react";
+import { ChangeEvent, DragEvent, useEffect, useRef, useState } from "react";
 import {
   AlertTriangle,
   Check,
@@ -27,7 +27,7 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
-import { Skeleton } from "@/components/ui/skeleton";
+import { Progress } from "@/components/ui/progress";
 import { useToast } from "@/hooks/use-toast";
 import { cn } from "@/lib/utils";
 import Image from "next/image";
@@ -102,6 +102,9 @@ export function ScheduleAnalyzer() {
       const base64Image = await toBase64(file);
       const analysisResult = await analyzeScheduleAction({ scheduleImage: base64Image });
       setResult(analysisResult);
+      if (!analysisResult.schedule && !analysisResult.errors) {
+        throw new Error("The AI failed to return a valid response.");
+      }
       setState("displaying");
       if (!analysisResult.schedule && analysisResult.errors) {
         toast({
@@ -112,9 +115,10 @@ export function ScheduleAnalyzer() {
       }
     } catch (error) {
       console.error(error);
+      const errorMessage = error instanceof Error ? error.message : "Something went wrong. Please try again.";
       toast({
         title: "Analysis Error",
-        description: "Something went wrong. Please try again.",
+        description: errorMessage,
         variant: "destructive",
       });
       setState("previewing");
@@ -205,19 +209,47 @@ export function ScheduleAnalyzer() {
 }
 
 function LoadingState() {
+  const [progress, setProgress] = useState(0);
+  const [message, setMessage] = useState("Analyzing your schedule...");
+
+  useEffect(() => {
+    const messages = [
+      "Extracting text from image...",
+      "Identifying subjects and times...",
+      "Checking for ambiguities...",
+      "Formatting the schedule...",
+      "Almost there...",
+    ];
+
+    const interval = setInterval(() => {
+      setProgress((prev) => {
+        if (prev >= 95) {
+          clearInterval(interval);
+          return 95;
+        }
+        const next = prev + 5;
+        const messageIndex = Math.floor(next / (100 / messages.length));
+        setMessage(messages[messageIndex] || "Finalizing...");
+        return next;
+      });
+    }, 800);
+
+    return () => clearInterval(interval);
+  }, []);
+
   return (
     <Card>
       <CardHeader>
-        <Skeleton className="h-8 w-48" />
-        <Skeleton className="h-5 w-64" />
+        <CardTitle>Analysis in Progress</CardTitle>
+        <CardDescription>
+          Please wait while we extract and structure your schedule.
+        </CardDescription>
       </CardHeader>
-      <CardContent className="space-y-4">
-        <Skeleton className="h-64 w-full" />
-        <Skeleton className="h-10 w-32" />
+      <CardContent className="flex flex-col items-center justify-center space-y-4 py-16 text-center">
+        <Loader2 className="size-12 animate-spin text-primary" />
+        <p className="text-muted-foreground">{message}</p>
+        <Progress value={progress} className="w-full max-w-sm" />
       </CardContent>
-      <CardFooter>
-        <Skeleton className="h-10 w-36" />
-      </CardFooter>
     </Card>
   );
 }
