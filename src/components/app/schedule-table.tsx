@@ -1,6 +1,12 @@
 "use client";
 
 import type { AnalyzeScheduleFromImageOutput } from "@/ai/flows/analyze-schedule-from-image";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { cn } from "@/lib/utils";
 import React from 'react';
 
@@ -9,7 +15,52 @@ type ScheduleData = AnalyzeScheduleFromImageOutput["schedule"];
 const days = ["sunday", "monday", "tuesday", "wednesday", "thursday"];
 const dayHeaders = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday"];
 
-export function ScheduleTable({ scheduleData }: { scheduleData: ScheduleData }) {
+const subjectList = [
+  "Arabic", "EN", "Bio", "CH", "PH", "MATH", "MEC", "CITZ", "ACTV", "ADV", "CAP", "REL", "F", "G", "PE", "CS", "Geo", "SOCIAL", "—", "Leave School"
+];
+
+const renderSubjectCell = (subject: string, isEditing: boolean) => {
+  const isSplit = subject.includes("/");
+
+  if (isSplit) {
+    return (
+      <>
+        <div className="flex-1 flex items-center justify-center p-1 border-b border-border/50 transition-transform duration-200 ease-in-out group-hover:scale-105 hover:!scale-110 hover:shadow-lg hover:z-10 bg-primary/5">
+          <span className="font-semibold text-foreground">
+            {subject.split('/')[0].trim()}
+          </span>
+        </div>
+        <div className="flex-1 flex items-center justify-center p-1 transition-transform duration-200 ease-in-out group-hover:scale-105 hover:!scale-110 hover:shadow-lg hover:z-10 bg-primary/5">
+          <span className="font-semibold text-foreground">
+            {subject.split('/')[1].trim()}
+          </span>
+        </div>
+      </>
+    );
+  }
+
+  return (
+    <div className={cn("flex-1 flex items-center justify-center p-2 transition-transform duration-200 ease-in-out",
+      {
+        "hover:scale-105 hover:shadow-lg hover:z-10": !isEditing,
+        "bg-primary/10": subject !== "—" && subject !== "",
+        "cursor-pointer": isEditing,
+      }
+    )}>
+      <span className={cn(
+        subject === "—" || subject === "" ? "text-muted-foreground/50" : "font-semibold text-foreground"
+      )}>
+        {subject}
+      </span>
+    </div>
+  );
+};
+
+export function ScheduleTable({ scheduleData, isEditing = false, onScheduleChange }: {
+  scheduleData: ScheduleData;
+  isEditing?: boolean;
+  onScheduleChange?: (rowIndex: number, day: string, newSubject: string) => void;
+}) {
   if (!scheduleData) return null;
 
   return (
@@ -45,41 +96,37 @@ export function ScheduleTable({ scheduleData }: { scheduleData: ScheduleData }) 
             </div>
             {days.map((day) => {
               const subject = row[day as keyof typeof row] as string;
-              const isSplit = subject.includes("/");
-              return (
+              
+              const cellContent = (
                 <div
-                  key={`${rowIndex}-${day}`}
                   className={cn(
                     "flex flex-col min-h-[4rem] bg-card p-0",
                     "group"
                   )}
                 >
-                  {isSplit ? (
-                    <>
-                      <div className="flex-1 flex items-center justify-center p-1 border-b border-border/50 transition-transform duration-200 ease-in-out group-hover:scale-105 hover:!scale-110 hover:shadow-lg hover:z-10 bg-primary/5">
-                        <span className="font-semibold text-foreground">
-                          {subject.split('/')[0].trim()}
-                        </span>
-                      </div>
-                      <div className="flex-1 flex items-center justify-center p-1 transition-transform duration-200 ease-in-out group-hover:scale-105 hover:!scale-110 hover:shadow-lg hover:z-10 bg-primary/5">
-                        <span className="font-semibold text-foreground">
-                          {subject.split('/')[1].trim()}
-                        </span>
-                      </div>
-                    </>
-                  ) : (
-                     <div className={cn("flex-1 flex items-center justify-center p-2 transition-transform duration-200 ease-in-out hover:scale-105 hover:shadow-lg hover:z-10",
-                      { "bg-primary/10": subject !== "—" && subject !== "" }
-                     )}>
-                      <span className={cn(
-                        subject === "—" || subject === "" ? "text-muted-foreground/50" : "font-semibold text-foreground"
-                      )}>
-                        {subject}
-                      </span>
-                    </div>
-                  )}
+                  {renderSubjectCell(subject, isEditing)}
                 </div>
               );
+
+              if (isEditing) {
+                return (
+                  <DropdownMenu key={`${rowIndex}-${day}`}>
+                    <DropdownMenuTrigger asChild>{cellContent}</DropdownMenuTrigger>
+                    <DropdownMenuContent className="w-40">
+                      {subjectList.map((s) => (
+                        <DropdownMenuItem
+                          key={s}
+                          onSelect={() => onScheduleChange?.(rowIndex, day, s)}
+                        >
+                          {s}
+                        </DropdownMenuItem>
+                      ))}
+                    </DropdownMenuContent>
+                  </DropdownMenu>
+                );
+              }
+
+              return <div key={`${rowIndex}-${day}`}>{cellContent}</div>;
             })}
           </React.Fragment>
         );

@@ -8,6 +8,8 @@ import {
   Copy,
   FileImage,
   Loader2,
+  Pencil,
+  Save,
   UploadCloud,
   X,
 } from "lucide-react";
@@ -34,6 +36,7 @@ import Image from "next/image";
 import { ScheduleTable } from "./schedule-table";
 
 type AnalysisState = "idle" | "previewing" | "loading" | "displaying";
+type ScheduleRow = AnalyzeScheduleFromImageOutput["schedule"][number];
 
 export function ScheduleAnalyzer() {
   const [state, setState] = useState<AnalysisState>("idle");
@@ -41,6 +44,8 @@ export function ScheduleAnalyzer() {
   const [file, setFile] = useState<File | null>(null);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const [result, setResult] = useState<AnalyzeScheduleFromImageOutput | null>(null);
+  const [editableSchedule, setEditableSchedule] = useState<ScheduleRow[]>([]);
+  const [isEditing, setIsEditing] = useState(false);
   const [isCopied, setIsCopied] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const { toast } = useToast();
@@ -85,6 +90,8 @@ export function ScheduleAnalyzer() {
     setFile(null);
     setPreviewUrl(null);
     setResult(null);
+    setEditableSchedule([]);
+    setIsEditing(false);
     setState("idle");
   };
 
@@ -103,6 +110,9 @@ export function ScheduleAnalyzer() {
       const base64Image = await toBase64(file);
       const analysisResult = await analyzeScheduleAction({ scheduleImage: base64Image });
       setResult(analysisResult);
+      if (analysisResult.schedule) {
+        setEditableSchedule(JSON.parse(JSON.stringify(analysisResult.schedule)));
+      }
       if (!analysisResult.schedule?.length && !analysisResult.errors) {
         throw new Error("The AI failed to return a valid response.");
       }
@@ -125,11 +135,21 @@ export function ScheduleAnalyzer() {
       setState("previewing");
     }
   };
+  
+  const handleScheduleChange = (rowIndex: number, day: string, newSubject: string) => {
+    setEditableSchedule(currentSchedule => {
+      const newSchedule = [...currentSchedule];
+      const row = { ...newSchedule[rowIndex] };
+      (row as any)[day] = newSubject;
+      newSchedule[rowIndex] = row;
+      return newSchedule;
+    });
+  };
 
   const onCopy = () => {
-    if (!result?.schedule) return;
+    if (!editableSchedule) return;
     // A simple text representation for copying
-    const textToCopy = result.schedule
+    const textToCopy = editableSchedule
       .map(row => `${row.session.padEnd(10)} | ${row.time.padEnd(12)} | ${row.sunday} | ${row.monday} | ${row.tuesday} | ${row.wednesday} | ${row.thursday}`)
       .join('\n');
     navigator.clipboard.writeText(textToCopy);
@@ -143,7 +163,16 @@ export function ScheduleAnalyzer() {
 
   if (state === "displaying" && result) {
     return (
-      <ResultState result={result} onCopy={onCopy} isCopied={isCopied} onReset={onReset} />
+      <ResultState
+        result={result}
+        editableSchedule={editableSchedule}
+        onCopy={onCopy}
+        isCopied={isCopied}
+        onReset={onReset}
+        isEditing={isEditing}
+        setIsEditing={setIsEditing}
+        onScheduleChange={handleScheduleChange}
+      />
     );
   }
 
@@ -259,11 +288,15 @@ function LoadingState() {
   );
 }
 
-function ResultState({ result, onCopy, isCopied, onReset }: {
+function ResultState({ result, editableSchedule, onCopy, isCopied, onReset, isEditing, setIsEditing, onScheduleChange }: {
   result: AnalyzeScheduleFromImageOutput;
+  editableSchedule: AnalyzeScheduleFromImageOutput['schedule'];
   onCopy: () => void;
   isCopied: boolean;
   onReset: () => void;
+  isEditing: boolean;
+  setIsEditing: (isEditing: boolean) => void;
+  onScheduleChange: (rowIndex: number, day: string, newSubject: string) => void;
 }) {
   return (
     <Card>
@@ -272,29 +305,39 @@ function ResultState({ result, onCopy, isCopied, onReset }: {
           <div>
             <CardTitle>Analyzed Schedule</CardTitle>
             <CardDescription>
-              Your structured schedule is ready.
+              {isEditing ? 'Click on a cell to edit the subject.' : 'Your structured schedule is ready.'}
             </CardDescription>
           </div>
-          <Button onClick={onCopy} variant="secondary" className="w-28">
-            {isCopied ? (
-              <Check className="text-green-500" />
-            ) : (
-              <Copy />
-            )}
-            {isCopied ? "Copied!" : "Copy Text"}
-          </Button>
+          <div className="flex gap-2">
+            <Button onClick={() => setIsEditing(!isEditing)} variant="outline" className="w-28">
+              {isEditing ? <Save /> : <Pencil />}
+              {isEditing ? "Save" : "Edit"}
+            </Button>
+            <Button onClick={onCopy} variant="secondary" className="w-28" disabled={isEditing}>
+              {isCopied ? (
+                <Check className="text-green-500" />
+              ) : (
+                <Copy />
+              )}
+              {isCopied ? "Copied!" : "Copy Text"}
+            </Button>
+          </div>
         </div>
       </CardHeader>
       <CardContent>
-        {result.errors && (
+        {result.errors && !isEditing && (
           <Alert variant="destructive" className="mb-4">
             <AlertTriangle className="h-4 w-4" />
             <AlertTitle>Ambiguities Found</AlertTitle>
             <AlertDescription>{result.errors}</AlertDescription>
           </Alert>
         )}
-        {(result.schedule && result.schedule.length > 0) ? (
-          <ScheduleTable scheduleData={result.schedule} />
+        {(editableSchedule && editableSchedule.length > 0) ? (
+          <ScheduleTable
+            scheduleData={editableSchedule}
+            isEditing={isEditing}
+            onScheduleChange={onScheduleChange}
+          />
         ) : (
           <div className="rounded-md border bg-muted p-4">
             <p className="text-center text-muted-foreground">The AI could not extract a schedule from the image.</p>

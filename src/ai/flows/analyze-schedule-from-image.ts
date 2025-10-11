@@ -71,40 +71,32 @@ Your task: analyze raw or visual school schedules (that may include half session
 **Your Instructions (Follow These Rules Exactly):**
 
 **⚙️ Rules:**
-1.  **Sessions:**
-    *   There are always 5 sessions per day, numbered 1–5.
-    *   If you see Arabic days (أحد, إثنين), you MUST read the schedule from RIGHT to LEFT.
-    *   Generate 5 session rows max.
+1.  **Right-to-Left (RTL) Language Detection:**
+    *   If you see Arabic days of the week (e.g., الأحد, الإثنين), you **MUST** process the schedule from RIGHT to LEFT, meaning the first column on the right is Sunday, the next is Monday, and so on.
 
-2.  **Full vs. Half Sessions:**
-    *   If an 80-minute session block contains two different 40-minute subjects (e.g., two different subject names in the same time slot), write them with a slash (e.g., \`Bio / CAP\`).
-    *   If an 80-minute session block contains the same subject repeated (e.g., "Bio" in both halves), write the subject name **only once** (e.g., \`Bio\`). **NEVER** write "Bio / Bio".
+2.  **Session Structure (Time-Based):**
+    *   There are 5 main sessions and 2 breaks. Your output **must** contain exactly 7 rows in the 'schedule' array.
+    *   Use the provided time slots for each session. Do not guess or change them.
+    *   **Breaks:** Always include "Break 1" and "Break 2" in their designated rows. For these rows, the 'session' field should be "Break 1" or "Break 2", and all other fields (time, days) must be empty strings.
 
-3.  **Breaks:**
-    *   **Break 1** comes after session 2.
-    *   **Break 2** comes after session 4.
-    *   Always include these as rows in the output. For break rows, the 'session' field should be "Break 1" or "Break 2", the 'time' field should be empty, and all day fields should be empty strings.
+3.  **Subject Parsing:**
+    *   **Single Subject per Timeslot:** If a single subject occupies a full time block (e.g., a full 80-minute slot), write the subject name **only once**. For example, \`Bio\`. **NEVER** write \`Bio / Bio\`.
+    *   **Split Subjects (Half Sessions):** If a time block is split between two different subjects, write them with a slash, like \`Bio / CAP\`.
+    *   **Optional Subjects:** If a slot offers a choice (e.g., French or German), write them with a slash: \`F / G\`. If you only see "F", you must expand it to \`F / G\`.
 
-4.  **Leaving Early:**
-    *   If the final session (session 5) is only a half session (40 minutes) and students leave afterward, write it like this: **“½ [Subject] + Leave School”**.
-    *   If the final session of any day is completely free/empty, you **must** write **"Leave School"** in that slot.
+4.  **Special Cases & Empty Slots:**
+    *   **Leaving Early:** If the final session of any day is unscheduled/empty, you **must** write **"Leave School"** in that slot. This is especially true for the 5th session on Thursday if it is free.
+    *   **Empty/Free Slots:** If any other session is completely empty, use a single dash (—).
 
-5.  **Optional Subjects:**
-    *   If a slot shows a choice between subjects (e.g., French or German), write them with a slash: **“F / G”**.
+5.  **Subject Codes (Use Only These):**
+    *   You must use the following codes. Do not invent new ones. If you see a subject not on this list, make your best guess to map it to one of these codes.
+    *   **Codes:** \`Arabic, EN, Bio, CH, PH, MATH, MEC, CITZ, ACTV, ADV, CAP, REL, F, G, PE, CS, Geo, SOCIAL, —, Leave School\`
 
-6.  **Empty Sessions:**
-    *   If a session is completely empty or unscheduled, use a dash (—).
-
-7.  **Subject Codes (Use Only These):**
-    *   Arabic, EN, Bio, CH, PH, MATH, MEC, CITZ, ACTV, ADV, CAP, REL, F, G, PE, CS, Geo, SOCIAL.
-    *   Use the codes exactly as they appear in the source image if they match this list.
-
-8.  **Output Format (Strictly JSON):**
-    *   You **MUST** produce a JSON array of objects in the \`schedule\` field.
-    *   Each object represents a row in the schedule.
+6.  **Output Format (Strictly JSON):**
+    *   You **MUST** produce a JSON object with a 'schedule' field containing an array of 7 objects.
     *   The structure for each row object must be:
         \`{ "session": "...", "time": "...", "sunday": "...", "monday": "...", "tuesday": "...", "wednesday": "...", "thursday": "..." }\`
-    *   Here is the data for the schedule. Complete the '...' fields based on the image provided.
+    *   Use this exact template. Do not add, remove, or change keys.
         \`[
           { "session": "1", "time": "7:45–9:05", "sunday": "...", "monday": "...", "tuesday": "...", "wednesday": "...", "thursday": "..." },
           { "session": "2", "time": "9:05–10:25", "sunday": "...", "monday": "...", "tuesday": "...", "wednesday": "...", "thursday": "..." },
@@ -116,14 +108,13 @@ Your task: analyze raw or visual school schedules (that may include half session
         ]\`
 
 **✅ Important "Don'ts":**
-*   **Do not** include teacher names.
-*   **Do not** repeat identical subjects for a full session (use the subject name only once).
-*   Keep capitalization consistent with the subject codes provided.
-*   Use ‘/’ for split halves and ‘½’ for single halves followed by leaving.
+*   **Do not** include teacher names or any other text not in the subject code list.
+*   **Do not** repeat identical subjects for a full session (e.g., "Bio / Bio").
+*   Keep capitalization consistent with the provided subject codes.
 
 ---
 
-Produce **only** the JSON array in the \`schedule\` field of the output. If you cannot parse the schedule, explain why in the \`errors\` field.`,
+Produce **only** the JSON output. If you cannot parse the schedule, describe the problem in the \`errors\` field and leave the \`schedule\` array empty.`,
 });
 
 const analyzeScheduleFromImageFlow = ai.defineFlow(
