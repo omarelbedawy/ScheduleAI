@@ -52,7 +52,8 @@ const analyzeScheduleFromImagePrompt = ai.definePrompt({
   prompt: `You are an AI assistant designed to extract and structure information from school schedules. Given an image of a schedule, extract the subjects, times, and days.
 
 IMPORTANT:
-- Pay close attention to session lengths. Some classes are full sessions (80 minutes) that span two 40-minute time blocks, while others are half sessions (40 minutes) fitting into a single block. Represent this accurately.
+- Pay close attention to session lengths. Some classes are full sessions (80 minutes) that span two 40-minute time blocks, while others are half sessions (40 minutes) fitting into a single block.
+- For 80-minute sessions, you MUST merge the two time blocks into a single block in the output table and write the subject name only once.
 - Do NOT include teacher names in the output.
 - Write all subjects and their abbreviations EXACTLY as they appear in the image. Do not expand or interpret them. For example, if you see 'Mec', write 'Mec', not 'Mechanics'.
 - Present the schedule in a clear, tabular format with days as columns and times as rows.
