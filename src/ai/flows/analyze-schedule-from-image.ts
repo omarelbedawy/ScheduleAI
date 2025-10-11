@@ -15,7 +15,7 @@ const AnalyzeScheduleFromImageInputSchema = z.object({
   scheduleImage: z
     .string()
     .describe(
-      'A photo of a school schedule, as a data URI that must include a MIME type and use Base64 encoding. Expected format: \'data:<mimetype>;base64,<encoded_data>\'.'
+      "A photo of a school schedule, as a data URI that must include a MIME type and use Base64 encoding. Expected format: 'data:<mimetype>;base64,<encoded_data>'."
     ),
 });
 export type AnalyzeScheduleFromImageInput = z.infer<
@@ -52,10 +52,11 @@ const analyzeScheduleFromImagePrompt = ai.definePrompt({
   prompt: `You are an AI assistant designed to extract and structure information from school schedules. Given an image of a schedule, extract the subjects, times, and days.
 
 IMPORTANT:
+- Pay close attention to session lengths. Some classes are full sessions (80 minutes) that span two 40-minute time blocks, while others are half sessions (40 minutes) fitting into a single block. Represent this accurately.
 - Do NOT include teacher names in the output.
 - Write all subjects and their abbreviations EXACTLY as they appear in the image. Do not expand or interpret them. For example, if you see 'Mec', write 'Mec', not 'Mechanics'.
 - Present the schedule in a clear, tabular format with days as columns and times as rows.
-- Identify any potential errors or ambiguities in the schedule and list them in the 'errors' field.
+- Identify any potential errors or ambiguities in the schedule and list them in the 'errors' field. Do not flag items as errors if you have correctly identified them, such as a class spanning two time blocks.
 
 Schedule Image: {{media url=scheduleImage}}
 
