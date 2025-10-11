@@ -122,13 +122,23 @@ export function SubjectCell({ subject, isEditing, onChange }: {
   const handleSubjectSelect = (newSubject: string, part?: 'first' | 'second') => {
     if (!part) {
       onChange(newSubject);
+      return;
+    }
+    
+    const parts = subject.split('/');
+    let firstPart = parts[0].trim();
+    let secondPart = parts[1].trim();
+
+    if (part === 'first') {
+      firstPart = newSubject;
     } else {
-      const parts = subject.split('/');
-      if (part === 'first') {
-        onChange(`${newSubject} / ${parts[1].trim()}`);
-      } else {
-        onChange(`${parts[0].trim()} / ${newSubject}`);
-      }
+      secondPart = newSubject;
+    }
+    
+    if (firstPart === secondPart) {
+      onChange(firstPart);
+    } else {
+      onChange(`${firstPart} / ${secondPart}`);
     }
   };
 
