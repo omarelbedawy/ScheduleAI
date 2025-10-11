@@ -79,7 +79,7 @@ Your task: analyze raw or visual school schedules (that may include half session
 2.  **Full vs. Half Sessions:**
     *   If both halves of an 80-minute session are the same subject → write the subject name **only once** (e.g., \`Bio\`).
     *   If the two 40-minute halves have different subjects → write them with a slash (e.g., \`Bio / CAP\`).
-    *   **Never** repeat the same subject twice in a row for a single session (e.g., not \`Bio Bio\`, but just \`Bio\`).
+    *   **Never** repeat the same subject twice in a row for a single session (e.g., not \`Bio / Bio\`, but just \`Bio\`).
 
 3.  **Breaks:**
     *   **Break 1** comes after session 2.
@@ -105,7 +105,7 @@ Your task: analyze raw or visual school schedules (that may include half session
     *   Each object represents a row in the schedule.
     *   The structure for each row object must be:
         \`{ "session": "...", "time": "...", "sunday": "...", "monday": "...", "tuesday": "...", "wednesday": "...", "thursday": "..." }\`
-    *   Here is the data for the first two sessions and the first break. Complete the rest of the schedule based on the image.
+    *   Here is the data for the schedule. Complete the '...' fields based on the image provided.
         \`[
           { "session": "1", "time": "7:45–9:05", "sunday": "...", "monday": "...", "tuesday": "...", "wednesday": "...", "thursday": "..." },
           { "session": "2", "time": "9:05–10:25", "sunday": "...", "monday": "...", "tuesday": "...", "wednesday": "...", "thursday": "..." },

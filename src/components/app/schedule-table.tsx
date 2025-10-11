@@ -2,6 +2,7 @@
 
 import type { AnalyzeScheduleFromImageOutput } from "@/ai/flows/analyze-schedule-from-image";
 import { cn } from "@/lib/utils";
+import React from 'react';
 
 type ScheduleData = AnalyzeScheduleFromImageOutput["schedule"];
 
@@ -9,6 +10,8 @@ const days = ["sunday", "monday", "tuesday", "wednesday", "thursday"];
 const dayHeaders = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday"];
 
 export function ScheduleTable({ scheduleData }: { scheduleData: ScheduleData }) {
+  if (!scheduleData) return null;
+
   return (
     <div className="grid grid-cols-[auto_auto_1fr_1fr_1fr_1fr_1fr] gap-px overflow-hidden rounded-lg border bg-border text-center text-sm shadow-md">
       {/* Header */}
@@ -48,7 +51,6 @@ export function ScheduleTable({ scheduleData }: { scheduleData: ScheduleData }) 
                   key={`${rowIndex}-${day}`}
                   className={cn(
                     "flex flex-col min-h-[4rem] bg-card p-0",
-                    { "bg-primary/10": subject !== "—" && subject !== "" && !isSplit },
                     "group"
                   )}
                 >
@@ -66,7 +68,9 @@ export function ScheduleTable({ scheduleData }: { scheduleData: ScheduleData }) 
                       </div>
                     </>
                   ) : (
-                    <div className="flex-1 flex items-center justify-center p-2 transition-transform duration-200 ease-in-out hover:scale-105 hover:shadow-lg hover:z-10">
+                     <div className={cn("flex-1 flex items-center justify-center p-2 transition-transform duration-200 ease-in-out hover:scale-105 hover:shadow-lg hover:z-10",
+                      { "bg-primary/10": subject !== "—" && subject !== "" }
+                     )}>
                       <span className={cn(
                         subject === "—" || subject === "" ? "text-muted-foreground/50" : "font-semibold text-foreground"
                       )}>
@@ -83,5 +87,3 @@ export function ScheduleTable({ scheduleData }: { scheduleData: ScheduleData }) 
     </div>
   );
 }
-// This needs to be a default import for React.lazy to work
-import React from 'react';
