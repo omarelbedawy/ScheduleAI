@@ -96,7 +96,7 @@ Your task: analyze raw or visual school schedules (that may include half session
     *   If a session is completely empty or unscheduled, use a dash (—).
 
 7.  **Subject Codes (Use Only These):**
-    *   Arabic, EN, Bio, CH, PH, MATH, MEC, CITZ, ACTV, ADV, CAP, REL, F, G, PE.
+    *   Arabic, EN, Bio, CH, PH, MATH, MEC, CITZ, ACTV, ADV, CAP, REL, F, G, PE, CS, Geo.
     *   Use the codes exactly as they appear in the source image if they match this list.
 
 8.  **Output Format (Strictly JSON):**
