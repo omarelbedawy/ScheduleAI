@@ -1,0 +1,78 @@
+/**
+ * @file Firestore Security Rules
+ * @core-philosophy This ruleset enforces a strict user-ownership model for user profiles
+ *  and allows public read access to classroom schedules. Only authenticated users can
+ *  create their own profiles.
+ * @data-structure
+ *  - /users/{userId}: Stores public profile information for each user. The `userId` in the path
+ *    must match the authenticated user's UID.
+ *  - /classrooms/{classroomId}: Stores the shared schedule for a classroom. The `classroomId`
+ *    is a combination of grade and class (e.g., '11-c'). This data is publicly readable.
+ * @key-security-decisions
+ *  - Users can only create, read, update, and delete their own profile data.
+ *  - Classroom schedules are publicly readable but not writable through the client.
+ */
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    /**
+     * @description Manages user profile access. Only the user themselves can create, read, update, or delete their profile.
+     * @path /users/{userId}
+     * @allow (create) - Authenticated user 'user_abc' can create their profile at /users/user_abc.
+     * @allow (get) - Authenticated user 'user_abc' can read their profile at /users/user_abc.
+     * @allow (update) - Authenticated user 'user_abc' can update their profile at /users/user_abc.
+     * @allow (delete) - Authenticated user 'user_abc' can delete their profile at /users/user_abc.
+     * @deny (create) - Authenticated user 'user_xyz' cannot create a profile at /users/user_abc.
+     * @deny (get) - Authenticated user 'user_xyz' cannot read the profile at /users/user_abc.
+     * @deny (update) - Authenticated user 'user_xyz' cannot update the profile at /users/user_abc.
+     * @deny (delete) - Authenticated user 'user_xyz' cannot delete the profile at /users/user_abc.
+     * @principle Enforces document ownership for writes and restricts access to a user's own data tree.
+     */
+    match /users/{userId} {
+      // Helper function to check if the request is made by the owner of the user document.
+      function isOwner(userId) {
+        return request.auth != null && request.auth.uid == userId;
+      }
+
+      // Helper function to check if the request is made by the existing owner of the user document, implying the document exists.
+      function isExistingOwner(userId) {
+        return isOwner(userId) && resource != null;
+      }
+
+      // Allows a user to create their own profile if the userId matches their authentication UID.
+      allow create: if isOwner(userId);
+
+      // Allows a user to get their own profile.
+      allow get: if isOwner(userId);
+
+      // Allows a user to list all users - this is generally discouraged for privacy reasons.
+      allow list: if false;
+
+      // Allows a user to update their own profile if the userId matches their authentication UID and the document exists.
+      allow update: if isExistingOwner(userId);
+
+      // Allows a user to delete their own profile if the userId matches their authentication UID and the document exists.
+      allow delete: if isExistingOwner(userId);
+    }
+
+    /**
+     * @description Manages access to classroom schedules.  Classroom schedules are publicly readable.
+     *  Writes are not permitted through the client.
+     * @path /classrooms/{classroomId}
+     * @allow (get) - Any user can read a classroom schedule.
+     * @allow (list) - Any user can list classroom schedules.
+     * @deny (create) - No one can create a classroom schedule document via client.
+     * @deny (update) - No one can update a classroom schedule document via client.
+     * @deny (delete) - No one can delete a classroom schedule document via client.
+     * @principle Allows public read access to classroom schedules but restricts writes.
+     */
+    match /classrooms/{classroomId} {
+      // Allows anyone to read classroom schedules.
+      allow get, list: if true;
+
+      // Disallows anyone from creating, updating, or deleting classroom schedules.
+      allow create, update, delete: if false;
+    }
+  }
+}
