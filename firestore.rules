@@ -2,73 +2,46 @@
  * @fileoverview Firestore Security Rules for Prototyping.
  *
  * Core Philosophy:
- * This ruleset enforces a user-ownership model for user profiles and allows public read access to classroom schedules.
+ * This ruleset prioritizes strict user-ownership for user profiles and read-only access to classroom schedules.
+ * It allows for rapid prototyping by focusing on authorization and bypassing data shape validation.
  *
  * Data Structure:
- * - /users/{userId}: Stores user profile data, accessible only by the user themselves.
- * - /classrooms/{classroomId}: Stores classroom schedules, publicly readable.
+ * - /users/{userId}: Stores public user profile information. Access is restricted to the owning user.
+ * - /classrooms/{classroomId}: Stores classroom schedules.  Read access is public to authenticated users; write access is disabled.
  *
  * Key Security Decisions:
- * - Users can only create, read, update, and delete their own profile data.
- * - Classroom schedules are publicly readable but writes are not allowed in this prototype.
- * - No user listing is allowed to prevent unauthorized data access.
+ * - User listing is implicitly denied (no `list` rule on `/users`).
+ * - Classroom schedules are readable by any authenticated user, but not writable, reflecting their shared nature.
  *
- * Denormalization for Authorization:
- *  - User profile documents are named with the userId, removing the need for additional fields for authorization.
- *
- * Structural Segregation:
- * - Private user data (profiles) is stored under /users/{userId}, while public data (classroom schedules) is stored in a top-level collection.
+ *  Denormalization for Authorization: N/A - Current rules do not require denormalization.
+ *  Structural Segregation: N/A - Public/private data is separated by collection; no need for flags.
  */
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
 
     /**
-     * @description Controls access to user profile documents.
+     * @description Enforces strict user-ownership for profile data.
      * @path /users/{userId}
-     * @allow (create) - User 'vNpWx0cOjbZscfEQUmNQFw5t7FJ3' can create their profile.
-     *    - Request: auth.uid = 'vNpWx0cOjbZscfEQUmNQFw5t7FJ3', resource.data.id = 'vNpWx0cOjbZscfEQUmNQFw5t7FJ3'
-     * @allow (get) - User 'vNpWx0cOjbZscfEQUmNQFw5t7FJ3' can read their profile.
-     *    - Request: auth.uid = 'vNpWx0cOjbZscfEQUmNQFw5t7FJ3'
-     * @allow (update) - User 'vNpWx0cOjbZscfEQUmNQFw5t7FJ3' can update their profile.
-     *    - Request: auth.uid = 'vNpWx0cOjbZscfEQUmNQFw5t7FJ3'
-     * @allow (delete) - User 'vNpWx0cOjbZscfEQUmNQFw5t7FJ3' can delete their profile.
-     *    - Request: auth.uid = 'vNpWx0cOjbZscfEQUmNQFw5t7FJ3'
-     * @deny (create) - User 'attackerUid' cannot create a profile for 'vNpWx0cOjbZscfEQUmNQFw5t7FJ3'.
-     *    - Request: auth.uid = 'attackerUid', resource.data.id = 'vNpWx0cOjbZscfEQUmNQFw5t7FJ3'
-     * @deny (get) - User 'attackerUid' cannot read the profile of 'vNpWx0cOjbZscfEQUmNQFw5t7FJ3'.
-     *    - Request: auth.uid = 'attackerUid'
-     * @deny (update) - User 'attackerUid' cannot update the profile of 'vNpWx0cOjbZscfEQUmNQFw5t7FJ3'.
-     *    - Request: auth.uid = 'attackerUid'
-     * @deny (delete) - User 'attackerUid' cannot delete the profile of 'vNpWx0cOjbZscfEQUmNQFw5t7FJ3'.
-     *    - Request: auth.uid = 'attackerUid'
+     * @allow (create) - Authenticated user with matching UID can create their profile.
+     * @allow (read, update, delete) - Authenticated user can read, update, and delete their own profile.
+     * @deny (create, read, update, delete) - Any other user attempts to access this profile.
      * @principle Enforces document ownership for all operations.
      */
     match /users/{userId} {
-      allow get: if isOwner(userId);
-      allow list: if false;
-      allow create: if isOwner(userId) && request.resource.data.id == userId;
-      allow update: if isExistingOwner(userId) && request.resource.data.id == resource.data.id;
-      allow delete: if isExistingOwner(userId);
+      allow read, update, delete: if isSignedIn() && isOwner(userId);
+      allow create: if isSignedIn() && isOwner(userId);
     }
 
     /**
-     * @description Allows public read access to classroom schedule documents.
+     * @description Allows any authenticated user to read classroom schedules. Writes are disabled.
      * @path /classrooms/{classroomId}
-     * @allow (get) - Any user can read a classroom schedule.
-     *    - Request: No auth required.
-     * @allow (list) - Any user can list classroom schedules.
-     *    - Request: No auth required.
-     * @deny (create) - No one can create classroom schedules in this prototype.
-     *    - Request: Any auth, any data.
-     * @deny (update) - No one can update classroom schedules in this prototype.
-     *    - Request: Any auth, any data.
-     * @deny (delete) - No one can delete classroom schedules in this prototype.
-     *    - Request: Any auth, any data.
-     * @principle Allows public reads, restricts all writes.
+     * @allow (read) - Any authenticated user can read classroom schedules.
+     * @deny (create, update, delete) - No one can modify classroom schedules.
+     * @principle Provides public read access with restricted writes for shared data.
      */
     match /classrooms/{classroomId} {
-      allow get, list: if true;
+      allow get, list: if isSignedIn();
       allow create, update, delete: if false;
     }
 
@@ -77,11 +50,7 @@ service cloud.firestore {
     }
 
     function isOwner(userId) {
-      return isSignedIn() && request.auth.uid == userId;
-    }
-
-    function isExistingOwner(userId) {
-      return isOwner(userId) && resource != null;
+      return request.auth.uid == userId;
     }
   }
 }

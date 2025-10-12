@@ -59,51 +59,46 @@ export function ScheduleAnalyzer() {
   const { toast } = useToast();
 
   const userProfileQuery = useMemoFirebase(() => {
-    if (!firestore || !user) return null;
+    // IMPORTANT: Do not create the query until the user is authenticated
+    if (!firestore || !user?.uid) return null;
     return doc(firestore, "users", user.uid);
   }, [firestore, user]);
   const { data: userProfile, loading: userProfileLoading } = useDoc<UserProfile>(userProfileQuery);
 
   const classroomId = useMemoFirebase(() => {
+    // Wait for user profile to be loaded
     if (!userProfile) return null;
     return `${userProfile.grade}-${userProfile.class}`;
   }, [userProfile]);
   
   const classroomDocRef = useMemoFirebase(() => {
+    // Wait for firestore and a valid classroomId
     if (!firestore || !classroomId) return null;
     return doc(firestore, 'classrooms', classroomId);
   }, [firestore, classroomId]);
   const { data: classroomSchedule, loading: classroomLoading } = useDoc<ClassroomSchedule>(classroomDocRef);
 
   useEffect(() => {
-    // Top-level loading state based on user auth
-    if (userLoading) {
+    // This effect now correctly handles the various loading and data states
+    const isLoading = userLoading || userProfileLoading || classroomLoading;
+    
+    // While any data is loading, show the initializing screen.
+    // But don't change state if we are in the middle of an AI analysis.
+    if (isLoading && state !== 'loading') {
       setState("initializing");
-      return;
-    }
-
-    // After user is loaded, check for user profile
-    if (user && !userProfile && !userProfileLoading) {
-      // This can happen if the doc doesn't exist or there was an error.
-      // For now, we assume the user needs to create a schedule.
-      setState("idle");
       return;
     }
     
-    // This is the main loading state for classroom schedule
-    if ((userProfileLoading || classroomLoading) && state !== 'loading') {
-      setState("initializing");
-      return;
-    }
-
+    // After all loading is done:
+    // If a classroom schedule exists, display it.
     if (classroomSchedule && classroomSchedule.schedule && classroomSchedule.schedule.length > 0) {
       setEditableSchedule(JSON.parse(JSON.stringify(classroomSchedule.schedule)));
       setState("displaying");
-    } else {
-      // If there's no user, no profile, or no schedule, the user should be prompted to upload one.
+    } else if (!isLoading) {
+      // If everything is loaded and there's still no schedule, prompt to upload.
       setState("idle");
     }
-  }, [user, userLoading, userProfile, userProfileLoading, classroomSchedule, classroomLoading, state]);
+  }, [userLoading, userProfileLoading, classroomLoading, classroomSchedule, state]);
 
 
   const handleFileSelect = (selectedFile: File | null) => {
