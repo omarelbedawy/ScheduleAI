@@ -9,12 +9,16 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Users } from "lucide-react";
 
 function getInitials(name: string) {
+    if (!name) return '';
     const names = name.split(' ');
     if (names.length === 1) return names[0].charAt(0).toUpperCase();
     return `${names[0].charAt(0)}${names[names.length - 1].charAt(0)}`.toUpperCase();
 }
 
 export function ClassmatesDashboard({ classmates }: { classmates: UserProfile[] | null }) {
+    // Make sure the current user isn't listed in their own classmates list
+    const otherClassmates = classmates;
+
     return (
         <Card>
             <CardHeader>
@@ -38,7 +42,7 @@ export function ClassmatesDashboard({ classmates }: { classmates: UserProfile[] 
                         </TableRow>
                     </TableHeader>
                     <TableBody>
-                        {!classmates ? (
+                        {!otherClassmates ? (
                              Array.from({ length: 3 }).map((_, i) => (
                                 <TableRow key={`skeleton-row-${i}`}>
                                     <TableCell>
@@ -52,14 +56,14 @@ export function ClassmatesDashboard({ classmates }: { classmates: UserProfile[] 
                                     </TableCell>
                                 </TableRow>
                             ))
-                        ) : classmates.length === 0 ? (
+                        ) : otherClassmates.length === 0 ? (
                              <TableRow>
                                 <TableCell colSpan={3} className="h-24 text-center">
-                                    No classmates found.
+                                    You're the first one here!
                                 </TableCell>
                             </TableRow>
                         ) : (
-                            classmates.map(student => (
+                            otherClassmates.map(student => (
                                 <TableRow key={student.uid}>
                                     <TableCell>
                                         <Avatar>
