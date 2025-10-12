@@ -451,5 +451,3 @@ export function SubjectCell({ subject, isEditing, onChange, user, classroomId, d
 
   return <div>{cellStructure}</div>;
 }
-
-  
