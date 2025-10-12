@@ -10,6 +10,7 @@ import { Loader2 } from "lucide-react";
 import { useFirestore, useDoc, useMemoFirebase } from "@/firebase";
 import type { UserProfile } from "@/lib/types";
 import { doc } from "firebase/firestore";
+import { TeacherDashboard } from "@/components/app/teacher-dashboard";
 
 export default function Home() {
   const { user, loading: userLoading } = useUser();
@@ -46,8 +47,7 @@ export default function Home() {
         <div className="min-h-screen bg-background text-foreground">
          <Header />
          <main className="container mx-auto px-4 pb-12">
-            <h1 className="text-3xl font-bold my-6">Teacher Dashboard</h1>
-            <p>Welcome, {userProfile.name}! Your teacher dashboard is under construction.</p>
+            <TeacherDashboard teacher={userProfile} />
          </main>
         </div>
     )
