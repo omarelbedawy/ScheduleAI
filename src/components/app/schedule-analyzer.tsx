@@ -61,13 +61,13 @@ export function ScheduleAnalyzer() {
   const userProfileQuery = useMemoFirebase(() => {
     if (!firestore || !user?.uid) return null;
     return doc(firestore, "users", user.uid);
-  }, [firestore, user]);
+  }, [firestore, user?.uid]);
   const { data: userProfile, loading: userProfileLoading } = useDoc<UserProfile>(userProfileQuery);
 
   const classroomId = useMemoFirebase(() => {
     if (!userProfile) return null;
     return `${userProfile.grade}-${userProfile.class}`;
-  }, [userProfile]);
+  }, [userProfile?.grade, userProfile?.class]);
   
   const classroomDocRef = useMemoFirebase(() => {
     if (!firestore || !classroomId) return null;
@@ -78,19 +78,19 @@ export function ScheduleAnalyzer() {
   useEffect(() => {
     const isComponentLoading = userLoading || userProfileLoading || classroomLoading;
     
-    if (state === 'initializing' && isComponentLoading) {
+    if (isComponentLoading) {
+      setState("initializing");
       return;
     }
 
-    if (state === 'initializing' && !isComponentLoading) {
-      if (classroomSchedule?.schedule && classroomSchedule.schedule.length > 0) {
-        setEditableSchedule(JSON.parse(JSON.stringify(classroomSchedule.schedule)));
-        setState("displaying");
-      } else {
-        setState("idle");
-      }
+    if (classroomSchedule?.schedule && classroomSchedule.schedule.length > 0) {
+      setEditableSchedule(JSON.parse(JSON.stringify(classroomSchedule.schedule)));
+      setState("displaying");
+    } else {
+      setState("idle");
     }
-  }, [userLoading, userProfileLoading, classroomLoading, classroomSchedule, state]);
+  // We add user?.uid to the dependency array to ensure this logic re-runs when the user changes.
+  }, [userLoading, userProfileLoading, classroomLoading, classroomSchedule, user?.uid]);
 
 
   const handleFileSelect = (selectedFile: File | null) => {
@@ -132,6 +132,7 @@ export function ScheduleAnalyzer() {
     if (previewUrl) URL.revokeObjectURL(previewUrl);
     setFile(null);
     setPreviewUrl(null);
+    // Re-evaluate the state based on whether a schedule exists.
     if (classroomSchedule?.schedule && classroomSchedule.schedule.length > 0) {
         setEditableSchedule(JSON.parse(JSON.stringify(classroomSchedule.schedule)));
         setState("displaying");
@@ -190,6 +191,7 @@ export function ScheduleAnalyzer() {
         description: errorMessage,
         variant: "destructive",
       });
+      // Go back to previewing state on error, instead of idle.
       setState("previewing");
     }
   };
@@ -244,7 +246,7 @@ export function ScheduleAnalyzer() {
     return <LoadingState isAnalyzing={state === "loading"} />;
   }
 
-  if (state === "displaying" && editableSchedule.length > 0) {
+  if (state === "displaying") {
     return (
       <ResultState
         classroomSchedule={classroomSchedule}
@@ -260,6 +262,7 @@ export function ScheduleAnalyzer() {
     );
   }
 
+  // Covers 'idle' and 'previewing' states
   return (
     <UploadCard
       isDragging={isDragging}
@@ -482,3 +485,5 @@ function UploadCard({
   );
 }
 
+
+    
