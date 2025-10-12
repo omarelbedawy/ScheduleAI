@@ -1,3 +1,4 @@
+
 "use client";
 
 import {
@@ -26,7 +27,7 @@ import {
 } from "@/components/ui/select";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { cn } from "@/lib/utils";
-import { ArrowLeftRight, Split, BookOpenCheck, Loader2 } from "lucide-react";
+import { ArrowLeftRight, Split, BookOpenCheck, Loader2, X } from "lucide-react";
 import React, { useState, KeyboardEvent } from 'react';
 import type { UserProfile, Explanation } from "@/lib/types";
 import { Button } from "../ui/button";
@@ -450,3 +451,5 @@ export function SubjectCell({ subject, isEditing, onChange, user, classroomId, d
 
   return <div>{cellStructure}</div>;
 }
+
+  
