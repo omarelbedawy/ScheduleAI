@@ -107,7 +107,7 @@ export function ScheduleAnalyzer() {
       // Using Saturday as the end of the week.
       const endOfLastWeek = endOfWeek(today, { weekStartsOn: 0 }); // Sunday as start of week
       
-      const upcomingExplanations = explanations.filter(exp => exp.status === 'Upcoming');
+      const upcomingExplanations = (explanations || []).filter(exp => exp.status === 'Upcoming');
       const pastExplanations = upcomingExplanations.filter(exp => {
         const expDate = (exp.explanationDate as Timestamp)?.toDate();
         return expDate && isBefore(expDate, endOfLastWeek);
@@ -611,3 +611,5 @@ function UploadCard({
     </Card>
   );
 }
+
+    
