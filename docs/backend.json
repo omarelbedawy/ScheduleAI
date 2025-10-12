@@ -15,26 +15,43 @@
           "format": "email",
           "description": "The user's email address."
         },
-        "age": {
-          "type": "number",
-          "description": "The user's age."
+        "role": {
+            "type": "string",
+            "description": "The role of the user.",
+            "enum": ["student", "teacher", "admin"]
         },
         "school": {
           "type": "string",
-          "description": "The user's school."
+          "description": "The user's school ID."
         },
         "grade": {
           "type": "string",
-          "description": "The user's grade level.",
-          "enum": ["10", "11", "12"]
+          "description": "The user's grade level (for students)."
         },
         "class": {
           "type": "string",
-          "description": "The user's class identifier.",
-          "enum": ["a", "b", "c", "d", "e", "f"]
+          "description": "The user's class identifier (for students)."
+        },
+        "teacherProfile": {
+            "type": "object",
+            "description": "Teacher-specific profile information.",
+            "properties": {
+                "classes": {
+                    "type": "array",
+                    "items": {
+                        "type": "object",
+                        "properties": {
+                            "grade": {"type": "string"},
+                            "class": {"type": "string"},
+                            "subject": {"type": "string"}
+                        },
+                        "required": ["grade", "class", "subject"]
+                    }
+                }
+            }
         }
       },
-      "required": ["name", "email", "age", "school", "grade", "class"]
+      "required": ["name", "email", "role", "school"]
     },
     "ClassroomSchedule": {
       "title": "Classroom Schedule",

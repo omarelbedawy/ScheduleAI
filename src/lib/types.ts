@@ -3,10 +3,19 @@ export interface UserProfile {
   uid: string;
   name: string;
   email: string;
-  age: number;
-  school: string;
-  grade: '10' | '11' | '12';
-  class: 'a' | 'b' | 'c' | 'd' | 'e' | 'f';
+  role: 'student' | 'teacher' | 'admin';
+  school: string; // School ID
+  // Student-specific
+  grade?: '10' | '11' | '12';
+  class?: 'a' | 'b' | 'c' | 'd' | 'e' | 'f';
+  // Teacher-specific
+  teacherProfile?: {
+    classes: {
+      grade: string;
+      class: string;
+      subject: string;
+    }[];
+  };
 }
 
 export interface ExplanationContributor {
@@ -18,8 +27,6 @@ export interface ExplanationContributor {
 
 export interface Explanation {
   id: string;
-  // userId: string; - Replaced by ownerId
-  // userName: string; - Replaced by contributors
   ownerId: string;
   contributors: ExplanationContributor[];
   subject: string;
