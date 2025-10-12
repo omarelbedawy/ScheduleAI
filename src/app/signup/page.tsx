@@ -1,3 +1,4 @@
+
 'use client';
 
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -58,6 +59,9 @@ export default function SignUpPage() {
       email: "",
       password: "",
       age: 15,
+      school: "",
+      grade: "11",
+      class: "c",
     },
   });
 
