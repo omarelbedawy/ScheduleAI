@@ -36,7 +36,7 @@ import { errorEmitter } from "@/firebase/error-emitter";
 import { FirestorePermissionError, type SecurityRuleContext } from "@/firebase/errors";
 import { schoolList } from "@/lib/schools";
 import { ClassmatesDashboard } from "./classmates-dashboard";
-import { isBefore } from 'date-fns';
+import { isBefore, startOfDay } from 'date-fns';
 
 type AnalysisState = "idle" | "previewing" | "loading" | "displaying" | "initializing";
 type ScheduleRow = AnalyzeScheduleFromImageOutput["schedule"][number];
@@ -104,6 +104,7 @@ export function ScheduleAnalyzer() {
   
     const archivePastExplanations = async () => {
       const now = new Date();
+      const todayStart = startOfDay(now);
       const upcomingExplanations = (explanations || []).filter(exp => exp.status === 'Upcoming');
   
       const scheduleTimeMap = new Map(classroomSchedule.schedule.map(row => [row.session, row.time]));
@@ -111,24 +112,34 @@ export function ScheduleAnalyzer() {
       const pastExplanations = upcomingExplanations.filter(exp => {
         const expDate = (exp.explanationDate as Timestamp)?.toDate();
         if (!expDate) return false;
-  
-        const sessionTime = scheduleTimeMap.get(exp.session);
-        if (!sessionTime) return false; // Cannot determine session time
-        
-        // e.g., "7:45–9:05"
-        const endTimeString = sessionTime.split('–')[1]; 
-        if (!endTimeString) return false;
-  
-        const [hours, minutes] = endTimeString.split(':').map(Number);
-        const sessionEndDateTime = new Date(expDate.getTime());
-        sessionEndDateTime.setHours(hours, minutes, 0, 0);
-  
-        // Mark as finished if the session end time is in the past
-        return isBefore(sessionEndDateTime, now);
+
+        const expDateStart = startOfDay(expDate);
+
+        // If the explanation date is before today, it's finished.
+        if (isBefore(expDateStart, todayStart)) {
+            return true;
+        }
+
+        // If the explanation is for today, check the time.
+        if (expDateStart.getTime() === todayStart.getTime()) {
+            const sessionTime = scheduleTimeMap.get(exp.session);
+            if (!sessionTime) return false;
+
+            const endTimeString = sessionTime.split('–')[1];
+            if (!endTimeString) return false;
+
+            const [hours, minutes] = endTimeString.split(':').map(Number);
+            
+            const nowTime = now.getHours() * 60 + now.getMinutes();
+            const sessionEndTime = hours * 60 + minutes;
+
+            return nowTime > sessionEndTime;
+        }
+
+        return false;
       });
   
       if (pastExplanations.length > 0) {
-        console.log(`Archiving ${pastExplanations.length} explanations...`);
         const batch = writeBatch(firestore);
         pastExplanations.forEach(exp => {
           const expRef = doc(firestore, 'classrooms', classroomId, 'explanations', exp.id);
@@ -626,5 +637,7 @@ function UploadCard({
     </Card>
   );
 }
+
+    
 
     
