@@ -100,18 +100,31 @@ export function ScheduleAnalyzer() {
 
   // Effect for archiving old explanations
   useEffect(() => {
-    if (!firestore || !classroomId || explanationsLoading || !explanations) return;
+    if (!firestore || !classroomId || explanationsLoading || !explanations || !classroomSchedule?.schedule) return;
   
     const archivePastExplanations = async () => {
-      const today = new Date();
-      today.setHours(0, 0, 0, 0); // Set to start of today for accurate comparison
-  
+      const now = new Date();
       const upcomingExplanations = (explanations || []).filter(exp => exp.status === 'Upcoming');
-      
+  
+      const scheduleTimeMap = new Map(classroomSchedule.schedule.map(row => [row.session, row.time]));
+  
       const pastExplanations = upcomingExplanations.filter(exp => {
         const expDate = (exp.explanationDate as Timestamp)?.toDate();
-        // Check if the explanation date is before today
-        return expDate && isBefore(expDate, today);
+        if (!expDate) return false;
+  
+        const sessionTime = scheduleTimeMap.get(exp.session);
+        if (!sessionTime) return false; // Cannot determine session time
+        
+        // e.g., "7:45–9:05"
+        const endTimeString = sessionTime.split('–')[1]; 
+        if (!endTimeString) return false;
+  
+        const [hours, minutes] = endTimeString.split(':').map(Number);
+        const sessionEndDateTime = new Date(expDate.getTime());
+        sessionEndDateTime.setHours(hours, minutes, 0, 0);
+  
+        // Mark as finished if the session end time is in the past
+        return isBefore(sessionEndDateTime, now);
       });
   
       if (pastExplanations.length > 0) {
@@ -124,8 +137,8 @@ export function ScheduleAnalyzer() {
         try {
           await batch.commit();
           toast({
-            title: "Weekly Cleanup",
-            description: "Past explanation commitments have been archived."
+            title: "Session Status Updated",
+            description: `Finished sessions have been updated.`,
           });
         } catch (error) {
           console.error("Failed to archive explanations:", error);
@@ -136,7 +149,7 @@ export function ScheduleAnalyzer() {
     // Run this check once on load
     archivePastExplanations();
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [firestore, classroomId, explanationsLoading]);
+  }, [firestore, classroomId, explanationsLoading, classroomSchedule]);
 
 
   useEffect(() => {
@@ -613,3 +626,5 @@ function UploadCard({
     </Card>
   );
 }
+
+    
