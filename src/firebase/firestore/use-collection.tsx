@@ -4,6 +4,9 @@
 import { useState, useEffect } from 'react';
 import { collection, onSnapshot, Query, DocumentData, QuerySnapshot } from 'firebase/firestore';
 import { useFirestore } from '../provider';
+import { errorEmitter } from '../error-emitter';
+import { FirestorePermissionError, type SecurityRuleContext } from '../errors';
+
 
 interface UseCollectionState<T> {
   data: T[] | null;
@@ -42,8 +45,12 @@ function useCollection_Internal<T>(query: Query<DocumentData> | null): UseCollec
       });
       setData(result);
       setLoading(false);
-    }, (error) => {
-      console.error("Error fetching collection:", error);
+    }, (serverError) => {
+      const permissionError = new FirestorePermissionError({
+        path: (query as any)._query.path.segments.join('/'),
+        operation: 'list',
+      } satisfies SecurityRuleContext);
+      errorEmitter.emit('permission-error', permissionError);
       setData(null);
       setLoading(false);
     });
