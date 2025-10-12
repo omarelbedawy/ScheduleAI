@@ -32,7 +32,7 @@ export function useDoc<T>(pathOrRef: string | DocumentReference | null): UseDocS
     
     const unsubscribe = onSnapshot(ref, (docSnap) => {
       if (docSnap.exists()) {
-        setData({ id: docSnap.id, ...docSnap.data() } as T);
+        setData({ uid: docSnap.id, ...docSnap.data() } as T);
       } else {
         setData(null);
       }
