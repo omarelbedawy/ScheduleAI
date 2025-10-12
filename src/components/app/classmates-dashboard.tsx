@@ -48,6 +48,7 @@ function ExplanationCard({
     const dayCapitalized = explanation.day.charAt(0).toUpperCase() + explanation.day.slice(1);
     const createdAtDate = explanation.createdAt?.toDate();
     const timeAgo = createdAtDate ? formatDistanceToNow(createdAtDate, { addSuffix: true }) : 'a while ago';
+    const loText = explanation.learningOutcome ? ` - LO ${explanation.learningOutcome}` : '';
 
     const handleDelete = async () => {
         if (!firestore || !classroomId || !explanation.id) {
@@ -81,7 +82,7 @@ function ExplanationCard({
             <CardHeader className="p-4 pr-12">
                 <CardTitle className="text-base flex items-center gap-2">
                     <BookUser className="size-5 text-primary" />
-                    {explanation.subject} - LO {explanation.learningOutcome}
+                    {explanation.subject}{loText}
                 </CardTitle>
                 <div className="space-y-1">
                     <CardDescription className="flex items-center gap-2 text-xs">
@@ -166,7 +167,7 @@ export function ClassmatesDashboard({ classmates, explanations, currentUser, cla
                     </div>
                 ) : (
                     classmates.map(student => {
-                        const studentExplanations = explanations?.filter(exp => exp.userId === student.uid) || [];
+                        const studentExplanations = explanations?.filter(exp => exp.userId === student.uid).sort((a, b) => b.createdAt.toDate() - a.createdAt.toDate()) || [];
                         return (
                             <div key={student.uid} className="flex items-start gap-4">
                                 <Avatar>

@@ -1,3 +1,4 @@
+
 {
   "entities": {
     "UserProfile": {
@@ -94,7 +95,7 @@
         },
         "learningOutcome": {
           "type": "number",
-          "description": "The learning outcome number (1-10)."
+          "description": "The learning outcome number (1-10). Not applicable for language subjects."
         },
         "concepts": {
           "type": "array",
@@ -106,7 +107,7 @@
           "format": "date-time"
         }
       },
-      "required": ["userId", "userName", "subject", "day", "session", "learningOutcome", "concepts"]
+      "required": ["userId", "userName", "subject", "day", "session", "concepts"]
     }
   },
   "auth": {

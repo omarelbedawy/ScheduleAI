@@ -16,7 +16,7 @@ export interface Explanation {
   subject: string;
   day: string;
   session: string;
-  learningOutcome: number;
+  learningOutcome?: number; // Optional now
   concepts: string[];
   createdAt: any; // Firestore timestamp
 }

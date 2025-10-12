@@ -14,7 +14,6 @@ import {
   DialogDescription,
   DialogHeader,
   DialogTitle,
-  DialogTrigger,
   DialogFooter,
   DialogClose,
 } from "@/components/ui/dialog";
@@ -27,7 +26,7 @@ import {
 } from "@/components/ui/select";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { cn } from "@/lib/utils";
-import { ArrowLeftRight, Split, BookOpenCheck, Loader2, X } from "lucide-react";
+import { ArrowLeftRight, Split, Loader2, X } from "lucide-react";
 import React, { useState, KeyboardEvent } from 'react';
 import type { UserProfile, Explanation } from "@/lib/types";
 import { Button } from "../ui/button";
@@ -49,39 +48,9 @@ const subjectList = [
   "Arabic", "EN", "Bio", "CH", "PH", "MATH", "MEC", "CITZ", "ACTV", "ADV", "CAP", "REL", "F", "G", "PE", "CS", "Geo", "SOCIAL", "—", "Leave School"
 ];
 
-const renderSubject = (subject: string, part: 'first' | 'second', isEditing: boolean) => {
-  const isSplit = subject.includes("/");
-  const subjectPart = isSplit
-    ? part === 'first'
-      ? subject.split('/')[0].trim()
-      : subject.split('/')[1].trim()
-    : subject;
+const explainableSubjects = ["MATH", "PH", "MEC", "Geo", "CH", "Bio", "Arabic", "EN", "F", "G"];
+const languageSubjects = ["Arabic", "EN", "F", "G"];
 
-  const isValidSubject = subjectPart && subjectPart !== "—" && subjectPart !== "Leave School";
-
-  return (
-    <div
-      className={cn(
-        "flex-1 flex items-center justify-center p-1 transition-transform duration-200 ease-in-out group-hover:scale-105",
-        {
-          "hover:!scale-110 hover:shadow-lg hover:z-10": isSplit && isValidSubject,
-          "p-2": !isSplit,
-          "cursor-pointer": isEditing || isValidSubject,
-        }
-      )}
-    >
-      <span
-        className={cn(
-          !isValidSubject
-            ? "text-muted-foreground/50"
-            : "font-semibold text-foreground"
-        )}
-      >
-        {subjectPart}
-      </span>
-    </div>
-  );
-};
 
 const SubjectDropdown = ({
   children,
@@ -162,6 +131,8 @@ const ExplainDialog = ({ user, classroomId, day, session, subject, children, onO
   const [concepts, setConcepts] = useState<string[]>([]);
   const [currentConcept, setCurrentConcept] = useState('');
 
+  const isLanguage = languageSubjects.includes(subject);
+
   const handleConceptKeyDown = (e: KeyboardEvent<HTMLInputElement>) => {
     if (e.key === 'Enter' && currentConcept.trim()) {
       e.preventDefault();
@@ -177,34 +148,39 @@ const ExplainDialog = ({ user, classroomId, day, session, subject, children, onO
   };
 
   const handleSubmit = async () => {
-    if (!learningOutcome || concepts.length === 0 || !firestore || !classroomId) {
+    if ((!isLanguage && !learningOutcome) || concepts.length === 0 || !firestore || !classroomId) {
       toast({
         variant: "destructive",
         title: "Missing Information",
-        description: "Please select a learning outcome and add at least one concept.",
+        description: isLanguage
+          ? "Please add at least one concept."
+          : "Please select a learning outcome and add at least one concept.",
       });
       return;
     }
 
     setIsLoading(true);
     try {
-      const explanationData = {
+      const explanationData: Omit<Explanation, 'id' | 'createdAt'> & { createdAt: any } = {
         userId: user.uid,
         userName: user.name,
         subject,
         day,
         session,
-        learningOutcome: parseInt(learningOutcome, 10),
         concepts,
         createdAt: serverTimestamp(),
       };
+
+      if (!isLanguage) {
+        explanationData.learningOutcome = parseInt(learningOutcome, 10);
+      }
       
       const explanationsColRef = collection(firestore, 'classrooms', classroomId, 'explanations');
       await addDoc(explanationsColRef, explanationData);
 
       toast({
         title: "Success!",
-        description: `You've signed up to explain LO ${learningOutcome} for ${subject}.`,
+        description: `You've signed up to explain concepts for ${subject}.`,
       });
 
       // Reset state and close dialog
@@ -237,23 +213,25 @@ const ExplainDialog = ({ user, classroomId, day, session, subject, children, onO
           </DialogDescription>
         </DialogHeader>
         <div className="grid gap-4 py-4">
-          <div className="grid grid-cols-4 items-center gap-4">
-            <Label htmlFor="lo-select" className="text-right">
-              LO
-            </Label>
-            <Select onValueChange={setLearningOutcome} value={learningOutcome}>
-              <SelectTrigger id="lo-select" className="col-span-3">
-                <SelectValue placeholder="Select a Learning Outcome" />
-              </SelectTrigger>
-              <SelectContent>
-                {Array.from({ length: 10 }, (_, i) => i + 1).map(lo => (
-                  <SelectItem key={lo} value={String(lo)}>
-                    Learning Outcome {lo}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
+          {!isLanguage && (
+            <div className="grid grid-cols-4 items-center gap-4">
+              <Label htmlFor="lo-select" className="text-right">
+                LO
+              </Label>
+              <Select onValueChange={setLearningOutcome} value={learningOutcome}>
+                <SelectTrigger id="lo-select" className="col-span-3">
+                  <SelectValue placeholder="Select an LO" />
+                </SelectTrigger>
+                <SelectContent>
+                  {Array.from({ length: 10 }, (_, i) => i + 1).map(lo => (
+                    <SelectItem key={lo} value={String(lo)}>
+                      Learning Outcome {lo}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          )}
           <div className="grid grid-cols-4 items-center gap-4">
             <Label htmlFor="concepts-input" className="text-right">
               Concepts
@@ -347,8 +325,6 @@ export function SubjectCell({ subject, isEditing, onChange, user, classroomId, d
     onChange(subject.split('/')[0].trim());
   };
 
-  const isValidSubject = subject && subject !== "—" && subject !== "Leave School";
-
   const renderCellContent = (sub: string, part: 'first' | 'second') => {
     const isSubjectSplit = sub.includes("/");
     const subjectPart = isSubjectSplit
@@ -356,9 +332,9 @@ export function SubjectCell({ subject, isEditing, onChange, user, classroomId, d
         ? sub.split('/')[0].trim()
         : sub.split('/')[1].trim()
       : sub;
+      
+    const canExplain = explainableSubjects.includes(subjectPart);
 
-    const isValidPart = subjectPart && subjectPart !== "—" && subjectPart !== "Leave School";
-    
     // Find explanations for this specific subject part
     const partExplanations = explanations.filter(e => e.subject === subjectPart);
 
@@ -368,15 +344,15 @@ export function SubjectCell({ subject, isEditing, onChange, user, classroomId, d
           "flex-1 flex flex-col items-center justify-center p-1 transition-transform duration-200 ease-in-out group-hover:scale-105",
           "relative", // For positioning the badge
           {
-            "hover:!scale-110 hover:shadow-lg hover:z-10": isSubjectSplit && isValidPart,
+            "hover:!scale-110 hover:shadow-lg hover:z-10": isSubjectSplit && canExplain,
             "p-2": !isSubjectSplit,
-            "cursor-pointer": isEditing || isValidPart,
+            "cursor-pointer": isEditing || canExplain,
           }
         )}
       >
         <span
           className={cn(
-            !isValidPart
+            !canExplain && subjectPart !== "—" && subjectPart !== "Leave School"
               ? "text-muted-foreground/50"
               : "font-semibold text-foreground"
           )}
@@ -404,7 +380,7 @@ export function SubjectCell({ subject, isEditing, onChange, user, classroomId, d
       return cellWrapper; // Dropdown is handled by the parent
     }
 
-    if (isValidPart && user && classroomId) {
+    if (canExplain && user && classroomId) {
       return (
         <ExplainDialog
           user={user}
