@@ -3,16 +3,28 @@
 import type { AnalyzeScheduleFromImageOutput } from "@/ai/flows/analyze-schedule-from-image";
 import React from 'react';
 import { SubjectCell } from "./subject-cell";
+import type { UserProfile, Explanation } from "@/lib/types";
+
 
 type ScheduleData = AnalyzeScheduleFromImageOutput["schedule"];
 
 const days = ["sunday", "monday", "tuesday", "wednesday", "thursday"];
 const dayHeaders = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday"];
 
-export function ScheduleTable({ scheduleData, isEditing = false, onScheduleChange }: {
+export function ScheduleTable({ 
+  scheduleData, 
+  isEditing = false, 
+  onScheduleChange,
+  user,
+  classroomId,
+  explanations,
+}: {
   scheduleData: ScheduleData;
   isEditing?: boolean;
   onScheduleChange?: (rowIndex: number, day: string, newSubject: string) => void;
+  user: UserProfile | null;
+  classroomId: string | null;
+  explanations: Explanation[];
 }) {
   if (!scheduleData) return null;
 
@@ -49,12 +61,21 @@ export function ScheduleTable({ scheduleData, isEditing = false, onScheduleChang
             </div>
             {days.map((day) => {
               const subject = row[day as keyof typeof row] as string;
+              const cellExplanations = explanations.filter(exp => 
+                exp.day === day && exp.session === row.session
+              );
+
               return (
                 <SubjectCell
                   key={`${rowIndex}-${day}`}
                   subject={subject}
                   isEditing={isEditing}
                   onChange={(newSubject) => onScheduleChange?.(rowIndex, day, newSubject)}
+                  user={user}
+                  classroomId={classroomId}
+                  day={day}
+                  session={row.session}
+                  explanations={cellExplanations}
                 />
               )
             })}

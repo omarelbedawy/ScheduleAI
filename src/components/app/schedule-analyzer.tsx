@@ -31,7 +31,7 @@ import { ScheduleTable } from "./schedule-table";
 import { useUser } from "@/firebase/auth/use-user";
 import { useFirestore, useDoc, useMemoFirebase, useCollection } from "@/firebase";
 import { doc, setDoc, serverTimestamp, collection, query, where } from "firebase/firestore";
-import type { UserProfile } from "@/lib/types";
+import type { UserProfile, Explanation } from "@/lib/types";
 import { errorEmitter } from "@/firebase/error-emitter";
 import { FirestorePermissionError, type SecurityRuleContext } from "@/firebase/errors";
 import { schoolList } from "@/lib/schools";
@@ -88,11 +88,17 @@ export function ScheduleAnalyzer() {
   }, [firestore, userProfile]);
   const { data: classmates, loading: classmatesLoading } = useCollection<UserProfile>(classmatesQuery);
 
+  const explanationsQuery = useMemoFirebase(() => {
+    if (!firestore || !classroomId) return null;
+    return collection(firestore, 'classrooms', classroomId, 'explanations');
+  }, [firestore, classroomId]);
+  const { data: explanations, loading: explanationsLoading } = useCollection<Explanation>(explanationsQuery);
+
+  const isLoading = userLoading || userProfileLoading || classroomLoading || classmatesLoading || explanationsLoading;
+
 
   useEffect(() => {
-    const isComponentLoading = userLoading || userProfileLoading || classroomLoading;
-    
-    if (isComponentLoading) {
+    if (isLoading) {
       setState("initializing");
       return;
     }
@@ -103,7 +109,7 @@ export function ScheduleAnalyzer() {
     } else {
       setState("idle");
     }
-  }, [userLoading, userProfileLoading, classroomLoading, classroomSchedule, user?.uid]);
+  }, [isLoading, classroomSchedule, user?.uid]);
 
 
   const handleFileSelect = (selectedFile: File | null) => {
@@ -262,23 +268,23 @@ export function ScheduleAnalyzer() {
     return `class ${userProfile.grade}${userProfile.class.toUpperCase()} at ${school?.name || 'your school'}`;
   }
 
-  if (state === "loading" || state === "initializing") {
+  if (isLoading || state === "loading") {
     return <LoadingState isAnalyzing={state === "loading"} />;
   }
   
-  // This state is now the default "nothing is happening" state.
-  // It handles both the initial "no schedule" view and the file preview.
   if (state === "idle" || state === "previewing") {
-    // If a schedule exists, but we are in idle (e.g. after a reset), we should show it.
     if (state === "idle" && classroomSchedule?.schedule?.length) {
        return (
         <ResultState
+            user={userProfile}
+            classroomId={classroomId}
             classroomSchedule={classroomSchedule}
             editableSchedule={editableSchedule.length ? editableSchedule : classroomSchedule.schedule}
             classmates={classmates}
+            explanations={explanations}
             onCopy={onCopy}
             isCopied={isCopied}
-            onReset={() => setState('idle')} // Reset should just change state to allow re-upload
+            onReset={() => setState('idle')}
             isEditing={isEditing}
             setIsEditing={setIsEditing}
             onScheduleChange={handleScheduleChange}
@@ -288,7 +294,8 @@ export function ScheduleAnalyzer() {
               if (previewUrl) URL.revokeObjectURL(previewUrl);
               setFile(null);
               setPreviewUrl(null);
-              setState("idle"); // Go to idle state to show upload UI
+              setEditableSchedule([]);
+              setState("idle");
             }}
         />
        );
@@ -314,9 +321,12 @@ export function ScheduleAnalyzer() {
   if (state === "displaying") {
     return (
       <ResultState
+        user={userProfile}
+        classroomId={classroomId}
         classroomSchedule={classroomSchedule}
         editableSchedule={editableSchedule}
         classmates={classmates}
+        explanations={explanations}
         onCopy={onCopy}
         isCopied={isCopied}
         onReset={() => setState('idle')}
@@ -329,7 +339,8 @@ export function ScheduleAnalyzer() {
             if (previewUrl) URL.revokeObjectURL(previewUrl);
             setFile(null);
             setPreviewUrl(null);
-            setState("idle"); // Go to idle state to show upload UI
+            setEditableSchedule([]);
+            setState("idle");
         }}
       />
     );
@@ -374,11 +385,11 @@ function LoadingState({ isAnalyzing }: { isAnalyzing: boolean }) {
   return (
     <Card>
       <CardHeader>
-        <CardTitle>{isAnalyzing ? "Analyzing..." : "Loading Schedule..."}</CardTitle>
+        <CardTitle>{isAnalyzing ? "Analyzing..." : "Loading Workspace..."}</CardTitle>
         <CardDescription>
           {isAnalyzing
             ? "Please wait while the AI processes your schedule image."
-            : "Please wait while we fetch the latest schedule for your class."}
+            : "Please wait while we fetch the latest data for your class."}
         </CardDescription>
       </CardHeader>
       <CardContent className="flex flex-col items-center justify-center space-y-4 py-16 text-center">
@@ -390,10 +401,13 @@ function LoadingState({ isAnalyzing }: { isAnalyzing: boolean }) {
   );
 }
 
-function ResultState({ classroomSchedule, editableSchedule, classmates, onCopy, isCopied, onReset, isEditing, setIsEditing, onScheduleChange, onSaveEdits, schoolName, onNewUpload }: {
+function ResultState({ user, classroomId, classroomSchedule, editableSchedule, classmates, explanations, onCopy, isCopied, onReset, isEditing, setIsEditing, onScheduleChange, onSaveEdits, schoolName, onNewUpload }: {
+  user: UserProfile | null;
+  classroomId: string | null;
   classroomSchedule: ClassroomSchedule | null | undefined;
   editableSchedule: AnalyzeScheduleFromImageOutput['schedule'];
   classmates: UserProfile[] | null;
+  explanations: Explanation[] | null;
   onCopy: () => void;
   isCopied: boolean;
   onReset: () => void;
@@ -418,6 +432,9 @@ function ResultState({ classroomSchedule, editableSchedule, classmates, onCopy, 
             </CardDescription>
           </div>
           <div className="flex gap-2">
+             <Button onClick={onNewUpload} variant="outline">
+              Upload New Schedule
+            </Button>
             <Button onClick={isEditing ? onSaveEdits : () => setIsEditing(true)} variant="outline" className="w-28">
               {isEditing ? <Save /> : <Pencil />}
               {isEditing ? "Save" : "Edit"}
@@ -439,6 +456,9 @@ function ResultState({ classroomSchedule, editableSchedule, classmates, onCopy, 
             scheduleData={editableSchedule}
             isEditing={isEditing}
             onScheduleChange={onScheduleChange}
+            user={user}
+            classroomId={classroomId}
+            explanations={explanations || []}
           />
         ) : (
           <div className="rounded-md border bg-muted p-4">
@@ -446,13 +466,13 @@ function ResultState({ classroomSchedule, editableSchedule, classmates, onCopy, 
           </div>
         )}
       </CardContent>
-      <CardFooter>
-        <Button onClick={onNewUpload} variant="outline">
-          Upload New Schedule
-        </Button>
-      </CardFooter>
+      
     </Card>
-    <ClassmatesDashboard classmates={classmates} />
+    <ClassmatesDashboard 
+        classmates={classmates} 
+        explanations={explanations} 
+        currentUser={user}
+    />
     </div>
   );
 }

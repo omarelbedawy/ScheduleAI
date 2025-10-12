@@ -66,6 +66,47 @@
         }
       },
       "required": ["schedule"]
+    },
+    "Explanation": {
+      "title": "Explanation Commitment",
+      "description": "Represents a student's commitment to explain a topic.",
+      "type": "object",
+      "properties": {
+        "userId": {
+          "type": "string",
+          "description": "The ID of the user who will explain."
+        },
+        "userName": {
+          "type": "string",
+          "description": "The name of the user who will explain."
+        },
+        "subject": {
+          "type": "string",
+          "description": "The subject of the session."
+        },
+        "day": {
+          "type": "string",
+          "description": "The day of the week for the session."
+        },
+        "session": {
+          "type": "string",
+          "description": "The session number."
+        },
+        "learningOutcome": {
+          "type": "number",
+          "description": "The learning outcome number (1-10)."
+        },
+        "concepts": {
+          "type": "array",
+          "items": { "type": "string" },
+          "description": "A list of concepts the user will explain."
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time"
+        }
+      },
+      "required": ["userId", "userName", "subject", "day", "session", "learningOutcome", "concepts"]
     }
   },
   "auth": {
@@ -79,6 +120,10 @@
     "/classrooms/{classroomId}": {
       "schema": { "$ref": "#/entities/ClassroomSchedule" },
       "description": "Stores the shared schedule for a classroom. The classroomId is a combination of school, grade and class, e.g., 'stem-kafr-elsheikh-11-c'."
+    },
+    "/classrooms/{classroomId}/explanations/{explanationId}": {
+      "schema": { "$ref": "#/entities/Explanation" },
+      "description": "Stores explanation commitments for a specific classroom."
     }
   }
 }
