@@ -1,13 +1,40 @@
-import { CalendarCheck } from "lucide-react";
+"use client";
+
+import { useUser } from "@/firebase/auth/use-user";
+import { auth } from "@/firebase/auth/client";
+import { signOut } from "firebase/auth";
+import { Button } from "@/components/ui/button";
+import { CalendarCheck, LogOut } from "lucide-react";
+import { useRouter } from "next/navigation";
 
 export function Header() {
+  const { user } = useUser();
+  const router = useRouter();
+
+  const handleSignOut = async () => {
+    await signOut(auth);
+    router.push('/login');
+  };
+
   return (
     <header className="border-b">
-      <div className="container mx-auto flex h-16 items-center gap-3 px-4">
-        <CalendarCheck className="size-7 text-primary" />
-        <h1 className="text-2xl font-bold tracking-tight text-foreground">
-          ScheduleAI
-        </h1>
+      <div className="container mx-auto flex h-16 items-center justify-between gap-3 px-4">
+        <div className="flex items-center gap-3">
+          <CalendarCheck className="size-7 text-primary" />
+          <h1 className="text-2xl font-bold tracking-tight text-foreground">
+            ScheduleAI
+          </h1>
+        </div>
+        {user && (
+          <div className="flex items-center gap-4">
+            <span className="text-sm text-muted-foreground hidden sm:inline">
+              Welcome, {user.displayName || user.email}
+            </span>
+            <Button variant="ghost" size="icon" onClick={handleSignOut} title="Sign Out">
+              <LogOut className="size-5" />
+            </Button>
+          </div>
+        )}
       </div>
     </header>
   );

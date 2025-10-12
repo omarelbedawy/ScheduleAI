@@ -1,0 +1,80 @@
+{
+  "entities": {
+    "UserProfile": {
+      "title": "User Profile",
+      "description": "Represents a user's profile information.",
+      "type": "object",
+      "properties": {
+        "name": {
+          "type": "string",
+          "description": "The user's full name."
+        },
+        "email": {
+          "type": "string",
+          "format": "email",
+          "description": "The user's email address."
+        },
+        "age": {
+          "type": "number",
+          "description": "The user's age."
+        },
+        "grade": {
+          "type": "string",
+          "description": "The user's grade level.",
+          "enum": ["10", "11", "12"]
+        },
+        "class": {
+          "type": "string",
+          "description": "The user's class identifier.",
+          "enum": ["a", "b", "c", "d", "e", "f"]
+        }
+      },
+      "required": ["name", "email", "age", "grade", "class"]
+    },
+    "ClassroomSchedule": {
+      "title": "Classroom Schedule",
+      "description": "Represents the shared schedule for a specific classroom.",
+      "type": "object",
+      "properties": {
+        "schedule": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "session": {"type": "string"},
+              "time": {"type": "string"},
+              "sunday": {"type": "string"},
+              "monday": {"type": "string"},
+              "tuesday": {"type": "string"},
+              "wednesday": {"type": "string"},
+              "thursday": {"type": "string"}
+            }
+          }
+        },
+        "lastUpdatedBy": {
+          "type": "string",
+          "description": "Name of the user who last updated the schedule."
+        },
+        "updatedAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "The timestamp of the last update."
+        }
+      },
+      "required": ["schedule"]
+    }
+  },
+  "auth": {
+    "providers": ["email-password"]
+  },
+  "firestore": {
+    "/users/{userId}": {
+      "schema": { "$ref": "#/entities/UserProfile" },
+      "description": "Stores public profile information for each user."
+    },
+    "/classrooms/{classroomId}": {
+      "schema": { "$ref": "#/entities/ClassroomSchedule" },
+      "description": "Stores the shared schedule for a classroom. The classroomId is a combination of grade and class, e.g., '11-c'."
+    }
+  }
+}

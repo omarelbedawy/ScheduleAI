@@ -1,3 +1,4 @@
+
 "use client";
 
 import type { AnalyzeScheduleFromImageOutput } from "@/ai/flows/analyze-schedule-from-image";
@@ -34,21 +35,50 @@ import { useToast } from "@/hooks/use-toast";
 import { cn } from "@/lib/utils";
 import Image from "next/image";
 import { ScheduleTable } from "./schedule-table";
+import { useUser } from "@/firebase/auth/use-user";
+import { useFirestore, useDoc, useMemoFirebase } from "@/firebase";
+import { doc, setDoc, serverTimestamp } from "firebase/firestore";
+import type { UserProfile } from "@/lib/types";
 
 type AnalysisState = "idle" | "previewing" | "loading" | "displaying";
 type ScheduleRow = AnalyzeScheduleFromImageOutput["schedule"][number];
 
+interface ClassroomSchedule {
+  schedule: ScheduleRow[];
+  lastUpdatedBy?: string;
+  updatedAt?: any;
+}
+
+
 export function ScheduleAnalyzer() {
+  const { user } = useUser();
+  const firestore = useFirestore();
   const [state, setState] = useState<AnalysisState>("idle");
   const [isDragging, setIsDragging] = useState(false);
   const [file, setFile] = useState<File | null>(null);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
-  const [result, setResult] = useState<AnalyzeScheduleFromImageOutput | null>(null);
   const [editableSchedule, setEditableSchedule] = useState<ScheduleRow[]>([]);
   const [isEditing, setIsEditing] = useState(false);
   const [isCopied, setIsCopied] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const { toast } = useToast();
+
+  const userProfileQuery = useMemoFirebase(() => user ? doc(firestore, "users", user.uid) : null, [firestore, user]);
+  const { data: userProfile } = useDoc<UserProfile>(userProfileQuery);
+
+  const classroomId = userProfile ? `${userProfile.grade}-${userProfile.class}` : null;
+  const classroomDocRef = useMemoFirebase(() => classroomId ? doc(firestore, 'classrooms', classroomId) : null, [firestore, classroomId]);
+  const { data: classroomSchedule, loading: classroomLoading } = useDoc<ClassroomSchedule>(classroomDocRef);
+
+  useEffect(() => {
+    if (classroomSchedule?.schedule) {
+      setEditableSchedule(JSON.parse(JSON.stringify(classroomSchedule.schedule)));
+      setState("displaying");
+    } else if (!classroomLoading) {
+      setState("idle");
+    }
+  }, [classroomSchedule, classroomLoading]);
+
 
   const handleFileSelect = (selectedFile: File | null) => {
     if (selectedFile && selectedFile.type.startsWith("image/")) {
@@ -89,10 +119,9 @@ export function ScheduleAnalyzer() {
     if (previewUrl) URL.revokeObjectURL(previewUrl);
     setFile(null);
     setPreviewUrl(null);
-    setResult(null);
-    setEditableSchedule([]);
+    setEditableSchedule(classroomSchedule?.schedule || []);
     setIsEditing(false);
-    setState("idle");
+    setState(classroomSchedule?.schedule ? "displaying" : "idle");
   };
 
   const toBase64 = (file: File): Promise<string> =>
@@ -104,25 +133,26 @@ export function ScheduleAnalyzer() {
     });
 
   const onSubmit = async () => {
-    if (!file) return;
+    if (!file || !classroomDocRef || !userProfile?.name) return;
     setState("loading");
     try {
       const base64Image = await toBase64(file);
       const analysisResult = await analyzeScheduleAction({ scheduleImage: base64Image });
-      setResult(analysisResult);
-      if (analysisResult.schedule) {
-        setEditableSchedule(JSON.parse(JSON.stringify(analysisResult.schedule)));
-      }
-      if (!analysisResult.schedule?.length && !analysisResult.errors) {
-        throw new Error("The AI failed to return a valid response.");
-      }
-      setState("displaying");
-      if (!analysisResult.schedule?.length && analysisResult.errors) {
-        toast({
-          title: "Analysis Failed",
-          description: analysisResult.errors,
-          variant: "destructive",
+
+      if (analysisResult.schedule && analysisResult.schedule.length > 0) {
+        await setDoc(classroomDocRef, {
+          schedule: analysisResult.schedule,
+          lastUpdatedBy: userProfile.name,
+          updatedAt: serverTimestamp(),
         });
+        setEditableSchedule(JSON.parse(JSON.stringify(analysisResult.schedule)));
+        setState("displaying");
+        toast({
+          title: "Schedule Updated",
+          description: `The new schedule was uploaded by ${userProfile.name}.`,
+        });
+      } else {
+         throw new Error(analysisResult.errors || "The AI failed to return a valid response.");
       }
     } catch (error) {
       console.error(error);
@@ -146,6 +176,22 @@ export function ScheduleAnalyzer() {
     });
   };
 
+  const onSaveEdits = async () => {
+    if (!classroomDocRef || !userProfile?.name) return;
+    
+    await setDoc(classroomDocRef, {
+      schedule: editableSchedule,
+      lastUpdatedBy: userProfile.name,
+      updatedAt: serverTimestamp(),
+    }, { merge: true });
+
+    setIsEditing(false);
+    toast({
+      title: "Schedule Saved",
+      description: "Your changes have been saved for the class.",
+    });
+  };
+
   const onCopy = () => {
     if (!editableSchedule) return;
     // A simple text representation for copying
@@ -157,14 +203,14 @@ export function ScheduleAnalyzer() {
     setTimeout(() => setIsCopied(false), 2000);
   };
 
-  if (state === "loading") {
+  if (state === "loading" || classroomLoading) {
     return <LoadingState />;
   }
 
-  if (state === "displaying" && result) {
+  if (state === "displaying" && editableSchedule.length > 0) {
     return (
       <ResultState
-        result={result}
+        classroomSchedule={classroomSchedule}
         editableSchedule={editableSchedule}
         onCopy={onCopy}
         isCopied={isCopied}
@@ -172,6 +218,7 @@ export function ScheduleAnalyzer() {
         isEditing={isEditing}
         setIsEditing={setIsEditing}
         onScheduleChange={handleScheduleChange}
+        onSaveEdits={onSaveEdits}
       />
     );
   }
@@ -186,6 +233,10 @@ export function ScheduleAnalyzer() {
       onDragLeave={onDragLeave}
       onDrop={onDrop}
     >
+      <CardHeader>
+        <CardTitle>No Schedule Found</CardTitle>
+        <CardDescription>Your class doesn't have a schedule yet. Upload one to get started!</CardDescription>
+      </CardHeader>
       <CardContent className="p-6">
         <input
           type="file"
@@ -274,9 +325,9 @@ function LoadingState() {
   return (
     <Card>
       <CardHeader>
-        <CardTitle>Analysis in Progress</CardTitle>
+        <CardTitle>Loading Schedule...</CardTitle>
         <CardDescription>
-          Please wait while we extract and structure your schedule.
+          Please wait while we fetch the latest schedule for your class.
         </CardDescription>
       </CardHeader>
       <CardContent className="flex flex-col items-center justify-center space-y-4 py-16 text-center">
@@ -288,8 +339,8 @@ function LoadingState() {
   );
 }
 
-function ResultState({ result, editableSchedule, onCopy, isCopied, onReset, isEditing, setIsEditing, onScheduleChange }: {
-  result: AnalyzeScheduleFromImageOutput;
+function ResultState({ classroomSchedule, editableSchedule, onCopy, isCopied, onReset, isEditing, setIsEditing, onScheduleChange, onSaveEdits }: {
+  classroomSchedule: ClassroomSchedule | null | undefined;
   editableSchedule: AnalyzeScheduleFromImageOutput['schedule'];
   onCopy: () => void;
   isCopied: boolean;
@@ -297,19 +348,22 @@ function ResultState({ result, editableSchedule, onCopy, isCopied, onReset, isEd
   isEditing: boolean;
   setIsEditing: (isEditing: boolean) => void;
   onScheduleChange: (rowIndex: number, day: string, newSubject: string) => void;
+  onSaveEdits: () => void;
 }) {
+  const lastUpdated = classroomSchedule?.updatedAt?.toDate().toLocaleString();
+
   return (
     <Card>
       <CardHeader>
         <div className="flex items-center justify-between">
           <div>
-            <CardTitle>Analyzed Schedule</CardTitle>
+            <CardTitle>Classroom Schedule</CardTitle>
             <CardDescription>
-              {isEditing ? 'Click on a cell to edit the subject.' : 'Your structured schedule is ready.'}
+              {isEditing ? 'Click on a cell to edit the subject.' : `Last updated by ${classroomSchedule?.lastUpdatedBy || 'N/A'} on ${lastUpdated || 'N/A'}`}
             </CardDescription>
           </div>
           <div className="flex gap-2">
-            <Button onClick={() => setIsEditing(!isEditing)} variant="outline" className="w-28">
+            <Button onClick={isEditing ? onSaveEdits : () => setIsEditing(true)} variant="outline" className="w-28">
               {isEditing ? <Save /> : <Pencil />}
               {isEditing ? "Save" : "Edit"}
             </Button>
@@ -325,13 +379,6 @@ function ResultState({ result, editableSchedule, onCopy, isCopied, onReset, isEd
         </div>
       </CardHeader>
       <CardContent>
-        {result.errors && !isEditing && (
-          <Alert variant="destructive" className="mb-4">
-            <AlertTriangle className="h-4 w-4" />
-            <AlertTitle>Ambiguities Found</AlertTitle>
-            <AlertDescription>{result.errors}</AlertDescription>
-          </Alert>
-        )}
         {(editableSchedule && editableSchedule.length > 0) ? (
           <ScheduleTable
             scheduleData={editableSchedule}
