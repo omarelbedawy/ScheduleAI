@@ -2,7 +2,7 @@
 "use client";
 
 import type { AnalyzeScheduleFromImageOutput } from "@/ai/flows/analyze-schedule-from-image";
-import { ChangeEvent, DragEvent, useEffect, useRef, useState } from "react";
+import { ChangeEvent, DragEvent, useEffect, useMemo, useRef, useState } from "react";
 import {
   Check,
   Copy,
@@ -29,12 +29,13 @@ import { cn } from "@/lib/utils";
 import Image from "next/image";
 import { ScheduleTable } from "./schedule-table";
 import { useUser } from "@/firebase/auth/use-user";
-import { useFirestore, useDoc, useMemoFirebase } from "@/firebase";
-import { doc, setDoc, serverTimestamp } from "firebase/firestore";
+import { useFirestore, useDoc, useMemoFirebase, useCollection } from "@/firebase";
+import { doc, setDoc, serverTimestamp, collection, query, where } from "firebase/firestore";
 import type { UserProfile } from "@/lib/types";
 import { errorEmitter } from "@/firebase/error-emitter";
 import { FirestorePermissionError, type SecurityRuleContext } from "@/firebase/errors";
 import { schoolList } from "@/lib/schools";
+import { ClassmatesDashboard } from "./classmates-dashboard";
 
 type AnalysisState = "idle" | "previewing" | "loading" | "displaying" | "initializing";
 type ScheduleRow = AnalyzeScheduleFromImageOutput["schedule"][number];
@@ -76,8 +77,19 @@ export function ScheduleAnalyzer() {
   }, [firestore, classroomId]);
   const { data: classroomSchedule, loading: classroomLoading } = useDoc<ClassroomSchedule>(classroomDocRef);
 
+  const classmatesQuery = useMemoFirebase(() => {
+    if (!firestore || !userProfile) return null;
+    return query(
+      collection(firestore, "users"),
+      where("school", "==", userProfile.school),
+      where("grade", "==", userProfile.grade),
+      where("class", "==", userProfile.class)
+    );
+  }, [firestore, userProfile]);
+  const { data: classmates, loading: classmatesLoading } = useCollection<UserProfile>(classmatesQuery);
+
+
   useEffect(() => {
-    // This effect now correctly depends on `user.uid` to re-evaluate when the user changes.
     const isComponentLoading = userLoading || userProfileLoading || classroomLoading;
     
     if (isComponentLoading) {
@@ -89,8 +101,6 @@ export function ScheduleAnalyzer() {
       setEditableSchedule(JSON.parse(JSON.stringify(classroomSchedule.schedule)));
       setState("displaying");
     } else {
-      // If we are not loading and there's no schedule, we should be in the idle state
-      // ready to accept an upload. This also handles the case of a new user.
       setState("idle");
     }
   }, [userLoading, userProfileLoading, classroomLoading, classroomSchedule, user?.uid]);
@@ -135,9 +145,16 @@ export function ScheduleAnalyzer() {
     if (previewUrl) URL.revokeObjectURL(previewUrl);
     setFile(null);
     setPreviewUrl(null);
-    setState("idle");
+    setEditableSchedule([]);
+    // After reset, if a schedule exists, go to 'displaying', else 'idle'.
+    if (classroomSchedule?.schedule && classroomSchedule.schedule.length > 0) {
+      setState("displaying");
+    } else {
+      setState("idle");
+    }
     setIsEditing(false);
   };
+  
 
   const toBase64 = (file: File): Promise<string> =>
     new Promise((resolve, reject) => {
@@ -248,40 +265,77 @@ export function ScheduleAnalyzer() {
   if (state === "loading" || state === "initializing") {
     return <LoadingState isAnalyzing={state === "loading"} />;
   }
+  
+  // This state is now the default "nothing is happening" state.
+  // It handles both the initial "no schedule" view and the file preview.
+  if (state === "idle" || state === "previewing") {
+    // If a schedule exists, but we are in idle (e.g. after a reset), we should show it.
+    if (state === "idle" && classroomSchedule?.schedule?.length) {
+       return (
+        <ResultState
+            classroomSchedule={classroomSchedule}
+            editableSchedule={editableSchedule.length ? editableSchedule : classroomSchedule.schedule}
+            classmates={classmates}
+            onCopy={onCopy}
+            isCopied={isCopied}
+            onReset={() => setState('idle')} // Reset should just change state to allow re-upload
+            isEditing={isEditing}
+            setIsEditing={setIsEditing}
+            onScheduleChange={handleScheduleChange}
+            onSaveEdits={onSaveEdits}
+            schoolName={getSchoolName()}
+            onNewUpload={() => {
+              if (previewUrl) URL.revokeObjectURL(previewUrl);
+              setFile(null);
+              setPreviewUrl(null);
+              setState("idle"); // Go to idle state to show upload UI
+            }}
+        />
+       );
+    }
+    return (
+      <UploadCard
+        isDragging={isDragging}
+        onDragOver={onDragOver}
+        onDragLeave={onDragLeave}
+        onDrop={onDrop}
+        fileInputRef={fileInputRef}
+        onFileChange={onFileChange}
+        state={state}
+        previewUrl={previewUrl}
+        onReset={onReset}
+        onSubmit={onSubmit}
+        schoolName={getSchoolName()}
+      />
+    );
+  }
+
 
   if (state === "displaying") {
     return (
       <ResultState
         classroomSchedule={classroomSchedule}
         editableSchedule={editableSchedule}
+        classmates={classmates}
         onCopy={onCopy}
         isCopied={isCopied}
-        onReset={onReset}
+        onReset={() => setState('idle')}
         isEditing={isEditing}
         setIsEditing={setIsEditing}
         onScheduleChange={handleScheduleChange}
         onSaveEdits={onSaveEdits}
         schoolName={getSchoolName()}
+        onNewUpload={() => {
+            if (previewUrl) URL.revokeObjectURL(previewUrl);
+            setFile(null);
+            setPreviewUrl(null);
+            setState("idle"); // Go to idle state to show upload UI
+        }}
       />
     );
   }
 
-  // Covers 'idle' and 'previewing' states
-  return (
-    <UploadCard
-      isDragging={isDragging}
-      onDragOver={onDragOver}
-      onDragLeave={onDragLeave}
-      onDrop={onDrop}
-      fileInputRef={fileInputRef}
-      onFileChange={onFileChange}
-      state={state}
-      previewUrl={previewUrl}
-      onReset={onReset}
-      onSubmit={onSubmit}
-      schoolName={getSchoolName()}
-    />
-  );
+  return null;
 }
 
 function LoadingState({ isAnalyzing }: { isAnalyzing: boolean }) {
@@ -336,9 +390,10 @@ function LoadingState({ isAnalyzing }: { isAnalyzing: boolean }) {
   );
 }
 
-function ResultState({ classroomSchedule, editableSchedule, onCopy, isCopied, onReset, isEditing, setIsEditing, onScheduleChange, onSaveEdits, schoolName }: {
+function ResultState({ classroomSchedule, editableSchedule, classmates, onCopy, isCopied, onReset, isEditing, setIsEditing, onScheduleChange, onSaveEdits, schoolName, onNewUpload }: {
   classroomSchedule: ClassroomSchedule | null | undefined;
   editableSchedule: AnalyzeScheduleFromImageOutput['schedule'];
+  classmates: UserProfile[] | null;
   onCopy: () => void;
   isCopied: boolean;
   onReset: () => void;
@@ -347,10 +402,12 @@ function ResultState({ classroomSchedule, editableSchedule, onCopy, isCopied, on
   onScheduleChange: (rowIndex: number, day: string, newSubject: string) => void;
   onSaveEdits: () => void;
   schoolName: string;
+  onNewUpload: () => void;
 }) {
   const lastUpdated = classroomSchedule?.updatedAt?.toDate().toLocaleString();
 
   return (
+    <div className="space-y-8">
     <Card>
       <CardHeader>
         <div className="flex items-center justify-between">
@@ -390,11 +447,13 @@ function ResultState({ classroomSchedule, editableSchedule, onCopy, isCopied, on
         )}
       </CardContent>
       <CardFooter>
-        <Button onClick={onReset} variant="outline">
+        <Button onClick={onNewUpload} variant="outline">
           Upload New Schedule
         </Button>
       </CardFooter>
     </Card>
+    <ClassmatesDashboard classmates={classmates} />
+    </div>
   );
 }
 
