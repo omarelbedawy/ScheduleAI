@@ -46,6 +46,7 @@ import { Loader2, Trash2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { schoolList } from "@/lib/schools";
 import { useToast } from "@/hooks/use-toast";
+import { Badge } from "@/components/ui/badge";
 
 interface ClassroomSchedule {
   schedule: any[];
