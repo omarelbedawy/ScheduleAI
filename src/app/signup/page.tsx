@@ -1,4 +1,3 @@
-
 'use client';
 
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -201,11 +200,14 @@ export default function SignUpPage() {
                   render={({ field }) => (
                     <FormItem>
                       <FormLabel>Class</FormLabel>
-                       <Select onValueChange={field.onChange} defaultValue={field.value}>
+                        <Select onValueChange={field.onChange} defaultValue={field.value}>
                         <FormControl>
                           <SelectTrigger>
                             <SelectValue placeholder="Class" />
-                          </Trigger>
+                          </SelectTrigger> 
+                          {/* This is the line that caused the error. 
+                            It was </Trigger> but should be </SelectTrigger> 
+                          */}
                         </FormControl>
                         <SelectContent>
                           {['a', 'b', 'c', 'd', 'e', 'f'].map(c => (
