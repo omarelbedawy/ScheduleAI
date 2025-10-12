@@ -4,6 +4,7 @@ export interface UserProfile {
   name: string;
   email: string;
   age: number;
+  school: string;
   grade: '10' | '11' | '12';
   class: 'a' | 'b' | 'c' | 'd' | 'e' | 'f';
 }

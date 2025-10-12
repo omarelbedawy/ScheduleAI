@@ -18,6 +18,10 @@
           "type": "number",
           "description": "The user's age."
         },
+        "school": {
+          "type": "string",
+          "description": "The user's school."
+        },
         "grade": {
           "type": "string",
           "description": "The user's grade level.",
@@ -29,7 +33,7 @@
           "enum": ["a", "b", "c", "d", "e", "f"]
         }
       },
-      "required": ["name", "email", "age", "grade", "class"]
+      "required": ["name", "email", "age", "school", "grade", "class"]
     },
     "ClassroomSchedule": {
       "title": "Classroom Schedule",
@@ -74,7 +78,7 @@
     },
     "/classrooms/{classroomId}": {
       "schema": { "$ref": "#/entities/ClassroomSchedule" },
-      "description": "Stores the shared schedule for a classroom. The classroomId is a combination of grade and class, e.g., '11-c'."
+      "description": "Stores the shared schedule for a classroom. The classroomId is a combination of school, grade and class, e.g., 'stem-kafr-elsheikh-11-c'."
     }
   }
 }

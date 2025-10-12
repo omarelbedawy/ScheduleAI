@@ -34,6 +34,7 @@ import { doc, setDoc, serverTimestamp } from "firebase/firestore";
 import type { UserProfile } from "@/lib/types";
 import { errorEmitter } from "@/firebase/error-emitter";
 import { FirestorePermissionError, type SecurityRuleContext } from "@/firebase/errors";
+import { schoolList } from "@/lib/schools";
 
 type AnalysisState = "idle" | "previewing" | "loading" | "displaying" | "initializing";
 type ScheduleRow = AnalyzeScheduleFromImageOutput["schedule"][number];
@@ -66,8 +67,8 @@ export function ScheduleAnalyzer() {
 
   const classroomId = useMemoFirebase(() => {
     if (!userProfile) return null;
-    return `${userProfile.grade}-${userProfile.class}`;
-  }, [userProfile?.grade, userProfile?.class]);
+    return `${userProfile.school}-${userProfile.grade}-${userProfile.class}`;
+  }, [userProfile?.school, userProfile?.grade, userProfile?.class]);
   
   const classroomDocRef = useMemoFirebase(() => {
     if (!firestore || !classroomId) return null;
@@ -76,6 +77,7 @@ export function ScheduleAnalyzer() {
   const { data: classroomSchedule, loading: classroomLoading } = useDoc<ClassroomSchedule>(classroomDocRef);
 
   useEffect(() => {
+    // This effect now correctly depends on `user.uid` to re-evaluate when the user changes.
     const isComponentLoading = userLoading || userProfileLoading || classroomLoading;
     
     if (isComponentLoading) {
@@ -87,9 +89,10 @@ export function ScheduleAnalyzer() {
       setEditableSchedule(JSON.parse(JSON.stringify(classroomSchedule.schedule)));
       setState("displaying");
     } else {
+      // If we are not loading and there's no schedule, we should be in the idle state
+      // ready to accept an upload. This also handles the case of a new user.
       setState("idle");
     }
-  // We add user?.uid to the dependency array to ensure this logic re-runs when the user changes.
   }, [userLoading, userProfileLoading, classroomLoading, classroomSchedule, user?.uid]);
 
 
@@ -132,13 +135,7 @@ export function ScheduleAnalyzer() {
     if (previewUrl) URL.revokeObjectURL(previewUrl);
     setFile(null);
     setPreviewUrl(null);
-    // Re-evaluate the state based on whether a schedule exists.
-    if (classroomSchedule?.schedule && classroomSchedule.schedule.length > 0) {
-        setEditableSchedule(JSON.parse(JSON.stringify(classroomSchedule.schedule)));
-        setState("displaying");
-    } else {
-        setState("idle");
-    }
+    setState("idle");
     setIsEditing(false);
   };
 
@@ -242,6 +239,12 @@ export function ScheduleAnalyzer() {
     setTimeout(() => setIsCopied(false), 2000);
   };
 
+  const getSchoolName = () => {
+    if (!userProfile) return "your class";
+    const school = schoolList.find(s => s.id === userProfile.school);
+    return `class ${userProfile.grade}${userProfile.class.toUpperCase()} at ${school?.name || 'your school'}`;
+  }
+
   if (state === "loading" || state === "initializing") {
     return <LoadingState isAnalyzing={state === "loading"} />;
   }
@@ -258,6 +261,7 @@ export function ScheduleAnalyzer() {
         setIsEditing={setIsEditing}
         onScheduleChange={handleScheduleChange}
         onSaveEdits={onSaveEdits}
+        schoolName={getSchoolName()}
       />
     );
   }
@@ -275,6 +279,7 @@ export function ScheduleAnalyzer() {
       previewUrl={previewUrl}
       onReset={onReset}
       onSubmit={onSubmit}
+      schoolName={getSchoolName()}
     />
   );
 }
@@ -331,7 +336,7 @@ function LoadingState({ isAnalyzing }: { isAnalyzing: boolean }) {
   );
 }
 
-function ResultState({ classroomSchedule, editableSchedule, onCopy, isCopied, onReset, isEditing, setIsEditing, onScheduleChange, onSaveEdits }: {
+function ResultState({ classroomSchedule, editableSchedule, onCopy, isCopied, onReset, isEditing, setIsEditing, onScheduleChange, onSaveEdits, schoolName }: {
   classroomSchedule: ClassroomSchedule | null | undefined;
   editableSchedule: AnalyzeScheduleFromImageOutput['schedule'];
   onCopy: () => void;
@@ -341,6 +346,7 @@ function ResultState({ classroomSchedule, editableSchedule, onCopy, isCopied, on
   setIsEditing: (isEditing: boolean) => void;
   onScheduleChange: (rowIndex: number, day: string, newSubject: string) => void;
   onSaveEdits: () => void;
+  schoolName: string;
 }) {
   const lastUpdated = classroomSchedule?.updatedAt?.toDate().toLocaleString();
 
@@ -349,7 +355,7 @@ function ResultState({ classroomSchedule, editableSchedule, onCopy, isCopied, on
       <CardHeader>
         <div className="flex items-center justify-between">
           <div>
-            <CardTitle>Classroom Schedule</CardTitle>
+            <CardTitle>Schedule for {schoolName}</CardTitle>
             <CardDescription>
               {isEditing ? 'Click on a cell to edit the subject.' : `Last updated by ${classroomSchedule?.lastUpdatedBy || 'N/A'} on ${lastUpdated || 'N/A'}`}
             </CardDescription>
@@ -403,6 +409,7 @@ function UploadCard({
   previewUrl,
   onReset,
   onSubmit,
+  schoolName,
 }: {
   isDragging: boolean;
   onDragOver: (e: DragEvent<HTMLDivElement>) => void;
@@ -414,6 +421,7 @@ function UploadCard({
   previewUrl: string | null;
   onReset: () => void;
   onSubmit: () => void;
+  schoolName: string;
 }) {
   return (
     <Card
@@ -427,7 +435,7 @@ function UploadCard({
     >
       <CardHeader>
         <CardTitle>No Schedule Found</CardTitle>
-        <CardDescription>Your class doesn't have a schedule yet. Upload one to get started!</CardDescription>
+        <CardDescription>The schedule for {schoolName} has not been uploaded yet. Be the first!</CardDescription>
       </CardHeader>
       <CardContent className="p-6">
         <input
@@ -484,6 +492,3 @@ function UploadCard({
     </Card>
   );
 }
-
-
-    

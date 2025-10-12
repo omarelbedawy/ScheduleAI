@@ -33,12 +33,14 @@ import { Loader2 } from "lucide-react";
 import { useState } from "react";
 import { FirestorePermissionError, type SecurityRuleContext } from "@/firebase/errors";
 import { errorEmitter } from "@/firebase/error-emitter";
+import { schoolList } from "@/lib/schools";
 
 const formSchema = z.object({
   name: z.string().min(2, "Name must be at least 2 characters."),
   email: z.string().email("Invalid email address."),
   password: z.string().min(6, "Password must be at least 6 characters."),
   age: z.coerce.number().min(10, "You must be at least 10 years old.").max(100),
+  school: z.string().min(1, "Please select your school."),
   grade: z.enum(["10", "11", "12"]),
   class: z.enum(["a", "b", "c", "d", "e", "f"]),
 });
@@ -75,6 +77,7 @@ export default function SignUpPage() {
         name: values.name,
         email: values.email,
         age: values.age,
+        school: values.school,
         grade: values.grade,
         class: values.class,
       };
@@ -109,8 +112,8 @@ export default function SignUpPage() {
   }
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-background px-4">
-      <Card className="w-full max-w-md">
+    <div className="flex min-h-screen items-center justify-center bg-background px-4 py-8">
+      <Card className="w-full max-w-lg">
         <CardHeader>
           <CardTitle>Create an Account</CardTitle>
           <CardDescription>Join your classroom to see the shared schedule.</CardDescription>
@@ -153,6 +156,28 @@ export default function SignUpPage() {
                     <FormControl>
                       <Input type="password" placeholder="••••••••" {...field} />
                     </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+               <FormField
+                control={form.control}
+                name="school"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>School</FormLabel>
+                    <Select onValueChange={field.onChange} defaultValue={field.value}>
+                      <FormControl>
+                        <SelectTrigger>
+                          <SelectValue placeholder="Select your school" />
+                        </SelectTrigger>
+                      </FormControl>
+                      <SelectContent>
+                        {schoolList.map(school => (
+                          <SelectItem key={school.id} value={school.id}>{school.name}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
                     <FormMessage />
                   </FormItem>
                 )}
@@ -203,7 +228,7 @@ export default function SignUpPage() {
                         <FormControl>
                           <SelectTrigger>
                             <SelectValue placeholder="Class" />
-                          </SelectTrigger>
+                          </Trigger>
                         </FormControl>
                         <SelectContent>
                           {['a', 'b', 'c', 'd', 'e', 'f'].map(c => (
