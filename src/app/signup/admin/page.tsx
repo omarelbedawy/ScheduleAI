@@ -86,7 +86,7 @@ export default function AdminSignUpPage() {
         description: "Welcome, administrator. You have been successfully signed up.",
       });
 
-      router.push("/"); // Or a dedicated admin dashboard
+      router.push("/dashboard");
 
     } catch (error: any) {
       toast({

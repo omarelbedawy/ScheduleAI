@@ -11,7 +11,7 @@ export default function SignUpPage() {
     <div className="flex min-h-screen items-center justify-center bg-background px-4 py-8">
       <Card className="w-full max-w-2xl">
         <CardHeader className="text-center">
-          <CardTitle>Join ScheduleAI</CardTitle>
+          <CardTitle>Join STS</CardTitle>
           <CardDescription>Select your role to get started.</CardDescription>
         </CardHeader>
         <CardContent className="grid grid-cols-1 md:grid-cols-3 gap-6 p-6">

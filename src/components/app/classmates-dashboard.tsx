@@ -137,6 +137,7 @@ function ExplanationCard({
 
     const isOwner = currentUser?.uid === explanation.ownerId;
     const isTeacher = currentUser?.role === 'teacher';
+    const isReviewed = explanation.completionStatus === 'explained' || explanation.completionStatus === 'not-explained';
 
     const createdAtDate = explanation.createdAt?.toDate();
     const timeAgo = createdAtDate ? formatDistanceToNow(createdAtDate, { addSuffix: true }) : 'a while ago';
@@ -200,8 +201,15 @@ function ExplanationCard({
         }
     }
 
+    const cardClasses = cn(
+        "bg-card/50 relative group transition-colors",
+        explanation.completionStatus === 'explained' && 'bg-green-500/10 border-green-500/50',
+        explanation.completionStatus === 'not-explained' && 'bg-red-500/10 border-red-500/50'
+    );
+
+
     return (
-        <Card className="bg-card/50 relative group">
+        <Card className={cardClasses}>
              <div className="absolute top-2 right-2 flex items-center gap-2">
                 {explanation.status === 'Finished' && <CompletionStatusIcon />}
 
@@ -258,7 +266,7 @@ function ExplanationCard({
                     ))}
                 </div>
                 <ContributorList contributors={explanation.contributors} />
-                {isTeacher && explanation.status === 'Finished' && (
+                {isTeacher && explanation.status === 'Finished' && !isReviewed && (
                     <div className="flex items-center justify-end gap-2 pt-2 border-t mt-3">
                         <span className="text-xs text-muted-foreground">Was it explained?</span>
                         <Button size="icon" variant="outline" className="h-7 w-7 hover:bg-green-100 dark:hover:bg-green-900" onClick={() => handleCompletionStatus('explained')}>

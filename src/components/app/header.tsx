@@ -4,8 +4,9 @@ import { useUser } from "@/firebase/auth/use-user";
 import { auth } from "@/firebase/auth/client";
 import { signOut } from "firebase/auth";
 import { Button } from "@/components/ui/button";
-import { CalendarCheck, LogOut } from "lucide-react";
+import { BookOpen, LogOut } from "lucide-react";
 import { useRouter } from "next/navigation";
+import Link from "next/link";
 
 export function Header() {
   const { user } = useUser();
@@ -19,12 +20,12 @@ export function Header() {
   return (
     <header className="border-b">
       <div className="container mx-auto flex h-16 items-center justify-between gap-3 px-4">
-        <div className="flex items-center gap-3">
-          <CalendarCheck className="size-7 text-primary" />
+        <Link href="/dashboard" className="flex items-center gap-3">
+          <BookOpen className="size-7 text-primary" />
           <h1 className="text-2xl font-bold tracking-tight text-foreground">
-            ScheduleAI
+            STS
           </h1>
-        </div>
+        </Link>
         {user && (
           <div className="flex items-center gap-4">
             <span className="text-sm text-muted-foreground hidden sm:inline">

@@ -4,8 +4,8 @@ import { Toaster } from "@/components/ui/toaster";
 import { FirebaseClientProvider } from '@/firebase/client-provider';
 
 export const metadata: Metadata = {
-  title: 'ScheduleAI',
-  description: 'Upload and analyze your school schedule with AI.',
+  title: 'STS (Self Teaching STEMer)',
+  description: 'A collaborative platform for STEM students to teach and learn from each other.',
 };
 
 export default function RootLayout({

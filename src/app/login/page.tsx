@@ -49,7 +49,7 @@ export default function LoginPage() {
         title: "Login Successful",
         description: "Welcome back!",
       });
-      router.push("/");
+      router.push("/dashboard");
     } catch (error: any) {
       console.error("Login error:", error);
       toast({
@@ -67,7 +67,7 @@ export default function LoginPage() {
       <Card className="w-full max-w-sm">
         <CardHeader>
           <CardTitle>Welcome Back</CardTitle>
-          <CardDescription>Log in to view your classroom's schedule.</CardDescription>
+          <CardDescription>Log in to access your STS dashboard.</CardDescription>
         </CardHeader>
         <CardContent>
           <Form {...form}>
@@ -108,6 +108,11 @@ export default function LoginPage() {
             Don't have an account?{" "}
             <Link href="/signup" className="underline">
               Sign up
+            </Link>
+          </div>
+           <div className="mt-4 text-center text-sm">
+            <Link href="/" className="underline">
+              Back to Home
             </Link>
           </div>
         </CardContent>

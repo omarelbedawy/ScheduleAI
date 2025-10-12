@@ -108,7 +108,7 @@ export default function TeacherSignUpPage() {
         description: "You have been successfully signed up as a teacher.",
       });
 
-      router.push("/");
+      router.push("/dashboard");
 
     } catch (error: any) {
       toast({ variant: "destructive", title: "Sign Up Failed", description: error.message || "An unexpected error occurred." });

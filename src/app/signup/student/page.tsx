@@ -99,7 +99,7 @@ export default function StudentSignUpPage() {
         description: "You have been successfully signed up as a student.",
       });
 
-      router.push("/");
+      router.push("/dashboard");
 
     } catch (error: any) {
       toast({
@@ -216,7 +216,7 @@ export default function StudentSignUpPage() {
                         <FormControl>
                           <SelectTrigger>
                             <SelectValue placeholder="Class" />
-                          </SelectTrigger>
+                          </Trigger>
                         </FormControl>
                         <SelectContent>
                           {['a', 'b', 'c', 'd', 'e', 'f'].map(c => (
