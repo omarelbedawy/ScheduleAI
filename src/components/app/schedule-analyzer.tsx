@@ -66,7 +66,7 @@ export function ScheduleAnalyzer() {
   }, [firestore, user?.uid]);
   const { data: userProfile, loading: userProfileLoading } = useDoc<UserProfile>(userProfileQuery);
 
-  const classroomId = useMemoFirebase(() => {
+  const classroomId = useMemo(() => {
     if (!userProfile) return null;
     return `${userProfile.school}-${userProfile.grade}-${userProfile.class}`;
   }, [userProfile?.school, userProfile?.grade, userProfile?.class]);
@@ -85,7 +85,7 @@ export function ScheduleAnalyzer() {
       where("grade", "==", userProfile.grade),
       where("class", "==", userProfile.class)
     );
-  }, [firestore, userProfile]);
+  }, [firestore, userProfile?.school, userProfile?.grade, userProfile?.class]);
   const { data: classmates, loading: classmatesLoading } = useCollection<UserProfile>(classmatesQuery);
 
   const explanationsQuery = useMemoFirebase(() => {
@@ -154,6 +154,7 @@ export function ScheduleAnalyzer() {
     setEditableSchedule([]);
     // After reset, if a schedule exists, go to 'displaying', else 'idle'.
     if (classroomSchedule?.schedule && classroomSchedule.schedule.length > 0) {
+      setEditableSchedule(JSON.parse(JSON.stringify(classroomSchedule.schedule)));
       setState("displaying");
     } else {
       setState("idle");
@@ -218,8 +219,8 @@ export function ScheduleAnalyzer() {
   
   const handleScheduleChange = (rowIndex: number, day: string, newSubject: string) => {
     setEditableSchedule(currentSchedule => {
-      const newSchedule = [...currentSchedule];
-      const row = { ...newSchedule[rowIndex] };
+      const newSchedule = JSON.parse(JSON.stringify(currentSchedule));
+      const row = newSchedule[rowIndex];
       (row as any)[day] = newSubject;
       newSchedule[rowIndex] = row;
       return newSchedule;
@@ -268,39 +269,43 @@ export function ScheduleAnalyzer() {
     return `class ${userProfile.grade}${userProfile.class.toUpperCase()} at ${school?.name || 'your school'}`;
   }
 
-  if (isLoading || state === "loading") {
-    return <LoadingState isAnalyzing={state === "loading"} />;
+  const handleNewUpload = () => {
+    if (previewUrl) URL.revokeObjectURL(previewUrl);
+    setFile(null);
+    setPreviewUrl(null);
+    setIsEditing(false);
+    setEditableSchedule([]);
+    setState("idle");
+  };
+
+  if (isLoading) {
+    return <LoadingState isAnalyzing={false} />;
+  }
+
+  if (state === "loading") {
+    return <LoadingState isAnalyzing={true} />;
   }
   
-  if (state === "idle" || state === "previewing") {
-    if (state === "idle" && classroomSchedule?.schedule?.length) {
-       return (
-        <ResultState
-            user={userProfile}
-            classroomId={classroomId}
-            classroomSchedule={classroomSchedule}
-            editableSchedule={editableSchedule.length ? editableSchedule : classroomSchedule.schedule}
-            classmates={classmates}
-            explanations={explanations}
-            onCopy={onCopy}
-            isCopied={isCopied}
-            onReset={() => setState('idle')}
-            isEditing={isEditing}
-            setIsEditing={setIsEditing}
-            onScheduleChange={handleScheduleChange}
-            onSaveEdits={onSaveEdits}
-            schoolName={getSchoolName()}
-            onNewUpload={() => {
-              if (previewUrl) URL.revokeObjectURL(previewUrl);
-              setFile(null);
-              setPreviewUrl(null);
-              setEditableSchedule([]);
-              setState("idle");
-            }}
-        />
-       );
-    }
+  if (state === "idle" && (!classroomSchedule?.schedule || classroomSchedule.schedule.length === 0)) {
     return (
+      <UploadCard
+        isDragging={isDragging}
+        onDragOver={onDragOver}
+        onDragLeave={onDragLeave}
+        onDrop={onDrop}
+        fileInputRef={fileInputRef}
+        onFileChange={onFileChange}
+        state={state}
+        previewUrl={previewUrl}
+        onReset={onReset}
+        onSubmit={onSubmit}
+        schoolName={getSchoolName()}
+      />
+    );
+  }
+
+  if (state === "previewing") {
+     return (
       <UploadCard
         isDragging={isDragging}
         onDragOver={onDragOver}
@@ -319,29 +324,23 @@ export function ScheduleAnalyzer() {
 
 
   if (state === "displaying") {
+    const currentSchedule = editableSchedule.length > 0 ? editableSchedule : classroomSchedule?.schedule || [];
     return (
       <ResultState
         user={userProfile}
         classroomId={classroomId}
         classroomSchedule={classroomSchedule}
-        editableSchedule={editableSchedule}
+        editableSchedule={currentSchedule}
         classmates={classmates}
         explanations={explanations}
         onCopy={onCopy}
         isCopied={isCopied}
-        onReset={() => setState('idle')}
         isEditing={isEditing}
         setIsEditing={setIsEditing}
         onScheduleChange={handleScheduleChange}
         onSaveEdits={onSaveEdits}
         schoolName={getSchoolName()}
-        onNewUpload={() => {
-            if (previewUrl) URL.revokeObjectURL(previewUrl);
-            setFile(null);
-            setPreviewUrl(null);
-            setEditableSchedule([]);
-            setState("idle");
-        }}
+        onNewUpload={handleNewUpload}
       />
     );
   }
@@ -401,7 +400,7 @@ function LoadingState({ isAnalyzing }: { isAnalyzing: boolean }) {
   );
 }
 
-function ResultState({ user, classroomId, classroomSchedule, editableSchedule, classmates, explanations, onCopy, isCopied, onReset, isEditing, setIsEditing, onScheduleChange, onSaveEdits, schoolName, onNewUpload }: {
+function ResultState({ user, classroomId, classroomSchedule, editableSchedule, classmates, explanations, onCopy, isCopied, isEditing, setIsEditing, onScheduleChange, onSaveEdits, schoolName, onNewUpload }: {
   user: UserProfile | null;
   classroomId: string | null;
   classroomSchedule: ClassroomSchedule | null | undefined;
@@ -410,7 +409,6 @@ function ResultState({ user, classroomId, classroomSchedule, editableSchedule, c
   explanations: Explanation[] | null;
   onCopy: () => void;
   isCopied: boolean;
-  onReset: () => void;
   isEditing: boolean;
   setIsEditing: (isEditing: boolean) => void;
   onScheduleChange: (rowIndex: number, day: string, newSubject: string) => void;
@@ -424,14 +422,14 @@ function ResultState({ user, classroomId, classroomSchedule, editableSchedule, c
     <div className="space-y-8">
     <Card>
       <CardHeader>
-        <div className="flex items-center justify-between">
+        <div className="flex flex-wrap items-center justify-between gap-2">
           <div>
             <CardTitle>Schedule for {schoolName}</CardTitle>
             <CardDescription>
               {isEditing ? 'Click on a cell to edit the subject.' : `Last updated by ${classroomSchedule?.lastUpdatedBy || 'N/A'} on ${lastUpdated || 'N/A'}`}
             </CardDescription>
           </div>
-          <div className="flex gap-2">
+          <div className="flex flex-wrap gap-2">
              <Button onClick={onNewUpload} variant="outline">
               Upload New Schedule
             </Button>
@@ -472,6 +470,7 @@ function ResultState({ user, classroomId, classroomSchedule, editableSchedule, c
         classmates={classmates} 
         explanations={explanations} 
         currentUser={user}
+        classroomId={classroomId}
     />
     </div>
   );
