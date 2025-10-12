@@ -49,8 +49,8 @@ const subjectList = [
   "Arabic", "EN", "Bio", "CH", "PH", "MATH", "MEC", "CITZ", "ACTV", "ADV", "CAP", "REL", "F", "G", "PE", "CS", "Geo", "SOCIAL", "—", "Leave School"
 ];
 
-const explainableSubjects = ["MATH", "PH", "MEC", "Geo", "CH", "Bio", "Arabic", "EN", "F", "G"];
-const languageSubjects = ["Arabic", "EN", "F", "G"];
+const explainableSubjects = ["MATH", "PH", "MEC", "Geo", "CH", "Bio", "Arabic", "EN", "F", "G", "CS"];
+const languageSubjects = ["Arabic", "EN", "F", "G", "CS"];
 
 
 const SubjectDropdown = ({
@@ -428,3 +428,5 @@ export function SubjectCell({ subject, isEditing, onChange, user, classroomId, d
 
   return <div>{cellStructure}</div>;
 }
+
+    
