@@ -36,7 +36,7 @@ import { errorEmitter } from "@/firebase/error-emitter";
 import { FirestorePermissionError, type SecurityRuleContext } from "@/firebase/errors";
 import { schoolList } from "@/lib/schools";
 import { ClassmatesDashboard } from "./classmates-dashboard";
-import { startOfWeek, isBefore, endOfWeek } from 'date-fns';
+import { isBefore } from 'date-fns';
 
 type AnalysisState = "idle" | "previewing" | "loading" | "displaying" | "initializing";
 type ScheduleRow = AnalyzeScheduleFromImageOutput["schedule"][number];
@@ -101,18 +101,19 @@ export function ScheduleAnalyzer() {
   // Effect for archiving old explanations
   useEffect(() => {
     if (!firestore || !classroomId || explanationsLoading || !explanations) return;
-
+  
     const archivePastExplanations = async () => {
       const today = new Date();
-      // Using Saturday as the end of the week.
-      const endOfLastWeek = endOfWeek(today, { weekStartsOn: 0 }); // Sunday as start of week
-      
+      today.setHours(0, 0, 0, 0); // Set to start of today for accurate comparison
+  
       const upcomingExplanations = (explanations || []).filter(exp => exp.status === 'Upcoming');
+      
       const pastExplanations = upcomingExplanations.filter(exp => {
         const expDate = (exp.explanationDate as Timestamp)?.toDate();
-        return expDate && isBefore(expDate, endOfLastWeek);
+        // Check if the explanation date is before today
+        return expDate && isBefore(expDate, today);
       });
-
+  
       if (pastExplanations.length > 0) {
         console.log(`Archiving ${pastExplanations.length} explanations...`);
         const batch = writeBatch(firestore);
@@ -131,6 +132,7 @@ export function ScheduleAnalyzer() {
         }
       }
     };
+    
     // Run this check once on load
     archivePastExplanations();
   // eslint-disable-next-line react-hooks/exhaustive-deps
