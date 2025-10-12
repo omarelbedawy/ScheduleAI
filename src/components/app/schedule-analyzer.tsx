@@ -39,6 +39,8 @@ import { useUser } from "@/firebase/auth/use-user";
 import { useFirestore, useDoc, useMemoFirebase } from "@/firebase";
 import { doc, setDoc, serverTimestamp } from "firebase/firestore";
 import type { UserProfile } from "@/lib/types";
+import { errorEmitter } from "@/firebase/error-emitter";
+import { FirestorePermissionError, type SecurityRuleContext } from "@/firebase/errors";
 
 type AnalysisState = "idle" | "previewing" | "loading" | "displaying";
 type ScheduleRow = AnalyzeScheduleFromImageOutput["schedule"][number];
@@ -140,11 +142,22 @@ export function ScheduleAnalyzer() {
       const analysisResult = await analyzeScheduleAction({ scheduleImage: base64Image });
 
       if (analysisResult.schedule && analysisResult.schedule.length > 0) {
-        await setDoc(classroomDocRef, {
+        const newScheduleData = {
           schedule: analysisResult.schedule,
           lastUpdatedBy: userProfile.name,
           updatedAt: serverTimestamp(),
+        };
+
+        setDoc(classroomDocRef, newScheduleData).catch(async (serverError) => {
+          const permissionError = new FirestorePermissionError({
+            path: classroomDocRef.path,
+            operation: 'create',
+            requestResourceData: newScheduleData,
+          } satisfies SecurityRuleContext);
+          errorEmitter.emit('permission-error', permissionError);
         });
+
+        // Optimistically update UI
         setEditableSchedule(JSON.parse(JSON.stringify(analysisResult.schedule)));
         setState("displaying");
         toast({
@@ -179,11 +192,20 @@ export function ScheduleAnalyzer() {
   const onSaveEdits = async () => {
     if (!classroomDocRef || !userProfile?.name) return;
     
-    await setDoc(classroomDocRef, {
+    const updatedScheduleData = {
       schedule: editableSchedule,
       lastUpdatedBy: userProfile.name,
       updatedAt: serverTimestamp(),
-    }, { merge: true });
+    };
+
+    setDoc(classroomDocRef, updatedScheduleData, { merge: true }).catch(async (serverError) => {
+        const permissionError = new FirestorePermissionError({
+          path: classroomDocRef.path,
+          operation: 'update',
+          requestResourceData: updatedScheduleData,
+        } satisfies SecurityRuleContext);
+        errorEmitter.emit('permission-error', permissionError);
+    });
 
     setIsEditing(false);
     toast({
@@ -399,3 +421,5 @@ function ResultState({ classroomSchedule, editableSchedule, onCopy, isCopied, on
     </Card>
   );
 }
+
+    
