@@ -46,24 +46,16 @@ function ContributorList({ contributors }: { contributors: ExplanationContributo
     if (acceptedContributors.length === 0) return null;
 
     return (
-        <div className="flex items-center space-x-2 text-xs text-muted-foreground">
-            <div className="flex items-center gap-1.5">
+        <div className="text-xs text-muted-foreground space-y-1">
+            <p className="font-medium">Explaining:</p>
+            <div className="flex flex-wrap items-center gap-x-4 gap-y-1">
                  {acceptedContributors.map(c => (
-                    <TooltipProvider key={c.userId}>
-                        <Tooltip>
-                            <TooltipTrigger asChild>
-                                 <div className="flex items-center gap-1.5">
-                                    <Avatar className="h-5 w-5 border-2 border-background">
-                                        <AvatarFallback className="text-[10px]">{getInitials(c.userName)}</AvatarFallback>
-                                    </Avatar>
-                                    <span className="text-xs font-medium">{c.userName}</span>
-                                </div>
-                            </TooltipTrigger>
-                            <TooltipContent>
-                                <p>{c.userName}</p>
-                            </TooltipContent>
-                        </Tooltip>
-                    </TooltipProvider>
+                    <div key={c.userId} className="flex items-center gap-1.5">
+                        <Avatar className="h-5 w-5 border-2 border-background">
+                            <AvatarFallback className="text-[10px]">{getInitials(c.userName)}</AvatarFallback>
+                        </Avatar>
+                        <span className="text-xs font-medium">{c.userName}</span>
+                    </div>
                  ))}
             </div>
         </div>
@@ -293,7 +285,11 @@ export function ClassmatesDashboard({ classmates, explanations, currentUser, cla
                     classmates.map(student => {
                         const studentExplanations = (explanations || [])
                             .filter(exp => (exp.contributors || []).some(c => c.userId === student.uid && c.status === 'accepted'))
-                            .sort((a, b) => b.createdAt.toDate() - a.createdAt.toDate());
+                            .sort((a, b) => {
+                                const dateA = a.createdAt?.toDate()?.getTime() || 0;
+                                const dateB = b.createdAt?.toDate()?.getTime() || 0;
+                                return dateB - dateA;
+                            });
 
                         return (
                             <div key={student.uid} className="flex items-start gap-4">
