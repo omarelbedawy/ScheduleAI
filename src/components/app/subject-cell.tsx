@@ -27,7 +27,7 @@ import {
 } from "@/components/ui/select";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { cn } from "@/lib/utils";
-import { ArrowLeftRight, Split, Loader2, X, UserPlus, Send } from "lucide-react";
+import { ArrowLeftRight, Split, Loader2, X } from "lucide-react";
 import React, { useState, KeyboardEvent, useMemo } from 'react';
 import type { UserProfile, Explanation, ExplanationContributor } from "@/lib/types";
 import { Button } from "../ui/button";
@@ -35,7 +35,7 @@ import { Label } from "../ui/label";
 import { Input } from "../ui/input";
 import { Badge } from "../ui/badge";
 import { useFirestore } from "@/firebase";
-import { collection, addDoc, serverTimestamp, query, where, getDocs } from "firebase/firestore";
+import { collection, addDoc, serverTimestamp } from "firebase/firestore";
 import { useToast } from "@/hooks/use-toast";
 import {
   Tooltip,
@@ -48,7 +48,7 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from "@/components/ui/popover";
-import { startOfWeek, addDays, nextDay } from 'date-fns';
+import { startOfWeek, addDays } from 'date-fns';
 
 
 const subjectList = [
@@ -452,6 +452,8 @@ export function SubjectCell({ subject, isEditing, onChange, user, classroomId, d
 
     // Find explanations for this specific subject part
     const partExplanations = explanations.filter(e => e.subject === subjectPart);
+    const acceptedCount = partExplanations.reduce((acc, exp) => acc + (exp.contributors || []).filter(c => c.status === 'accepted').length, 0);
+
 
     const cellWrapper = (
       <div
@@ -474,16 +476,16 @@ export function SubjectCell({ subject, isEditing, onChange, user, classroomId, d
         >
           {subjectPart}
         </span>
-        {partExplanations.length > 0 && !isEditing && (
+        {acceptedCount > 0 && !isEditing && (
            <TooltipProvider>
             <Tooltip>
               <TooltipTrigger asChild>
                 <div className="absolute top-1 right-1 flex items-center justify-center h-4 w-4 rounded-full bg-accent text-accent-foreground text-[10px] font-bold">
-                  {partExplanations.reduce((acc, exp) => acc + (exp.contributors || []).filter(c => c.status === 'accepted').length, 0)}
+                  {acceptedCount}
                 </div>
               </TooltipTrigger>
               <TooltipContent>
-                 <p>{partExplanations.reduce((acc, exp) => acc + (exp.contributors || []).filter(c => c.status === 'accepted').length, 0)} student(s) will explain this.</p>
+                 <p>{acceptedCount} student(s) will explain this.</p>
               </TooltipContent>
             </Tooltip>
            </TooltipProvider>

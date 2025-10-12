@@ -41,32 +41,31 @@ function getInitials(name: string) {
 
 
 function ContributorList({ contributors }: { contributors: ExplanationContributor[] }) {
-    const visibleContributors = (contributors || []).filter(c => c.status === 'accepted' || c.status === 'pending');
-    const acceptedCount = (contributors || []).filter(c => c.status === 'accepted').length;
+    const acceptedContributors = (contributors || []).filter(c => c.status === 'accepted');
 
-    if (visibleContributors.length === 0) return null;
+    if (acceptedContributors.length === 0) return null;
 
     return (
         <div className="flex items-center space-x-2 text-xs text-muted-foreground">
-            <div className="flex -space-x-2 overflow-hidden">
-                 {visibleContributors.slice(0, 3).map(c => (
+            <div className="flex items-center gap-1.5">
+                 {acceptedContributors.map(c => (
                     <TooltipProvider key={c.userId}>
                         <Tooltip>
                             <TooltipTrigger asChild>
-                                <Avatar className="h-5 w-5 border-2 border-background">
-                                    <AvatarFallback className="text-[10px]">{getInitials(c.userName)}</AvatarFallback>
-                                </Avatar>
+                                 <div className="flex items-center gap-1.5">
+                                    <Avatar className="h-5 w-5 border-2 border-background">
+                                        <AvatarFallback className="text-[10px]">{getInitials(c.userName)}</AvatarFallback>
+                                    </Avatar>
+                                    <span className="text-xs font-medium">{c.userName}</span>
+                                </div>
                             </TooltipTrigger>
                             <TooltipContent>
-                                <p>{c.userName} ({c.status})</p>
+                                <p>{c.userName}</p>
                             </TooltipContent>
                         </Tooltip>
                     </TooltipProvider>
                  ))}
             </div>
-            {visibleContributors.length > 3 && (
-                <span className="text-xs font-medium">+{visibleContributors.length - 3} more</span>
-            )}
         </div>
     )
 }
@@ -75,23 +74,27 @@ function InvitationManager({
     explanation,
     currentUser,
     classroomId,
+    classmates,
 } : {
     explanation: Explanation;
     currentUser: UserProfile | null;
     classroomId: string | null;
+    classmates: UserProfile[] | null;
 }) {
     const firestore = useFirestore();
     const { toast } = useToast();
     const userInvite = (explanation.contributors || []).find(c => c.userId === currentUser?.uid && c.status === 'pending');
+    
+    const owner = (classmates || []).find(c => c.uid === explanation.ownerId);
 
     if (!userInvite) return null;
 
     const handleInvitationResponse = async (accept: boolean) => {
-        if (!firestore || !classroomId) return;
+        if (!firestore || !classroomId || !currentUser?.uid) return;
         const explanationRef = doc(firestore, 'classrooms', classroomId, 'explanations', explanation.id);
 
         const newContributors = (explanation.contributors || []).map(c => 
-            c.userId === currentUser?.uid ? { ...c, status: accept ? 'accepted' : 'declined' } : c
+            c.userId === currentUser.uid ? { ...c, status: accept ? 'accepted' : 'declined' } : c
         );
 
         try {
@@ -112,7 +115,9 @@ function InvitationManager({
     return (
         <Card className="my-2 bg-accent/20 border-accent/50">
             <CardContent className="p-3 flex items-center justify-between">
-                <p className="text-sm font-medium">You were invited to explain this topic.</p>
+                <p className="text-sm font-medium">
+                  <span className="font-bold">{owner?.name || 'A classmate'}</span> invited you to explain <span className="font-bold">{explanation.subject}</span>.
+                </p>
                 <div className="flex gap-2">
                     <Button size="sm" onClick={() => handleInvitationResponse(true)}><ThumbsUp className="mr-1 h-4 w-4"/> Accept</Button>
                     <Button size="sm" variant="destructive" onClick={() => handleInvitationResponse(false)}><ThumbsDown className="mr-1 h-4 w-4"/> Decline</Button>
@@ -136,13 +141,12 @@ function ExplanationCard({
     const { toast } = useToast();
 
     const isOwner = currentUser?.uid === explanation.ownerId;
-    const dayCapitalized = explanation.day.charAt(0).toUpperCase() + explanation.day.slice(1);
     
     const createdAtDate = explanation.createdAt?.toDate();
     const timeAgo = createdAtDate ? formatDistanceToNow(createdAtDate, { addSuffix: true }) : 'a while ago';
     
     const explanationDate = explanation.explanationDate?.toDate();
-    const fullDate = explanationDate ? format(explanationDate, 'EEEE, MMMM d') : dayCapitalized;
+    const fullDate = explanationDate ? format(explanationDate, 'EEEE, MMMM d') : explanation.day.charAt(0).toUpperCase() + explanation.day.slice(1);
 
     const loText = explanation.learningOutcome ? ` - LO ${explanation.learningOutcome}` : '';
 
@@ -239,8 +243,9 @@ export function ClassmatesDashboard({ classmates, explanations, currentUser, cla
     classroomId: string | null;
 }) {
 
-    const userExplanations = explanations?.filter(exp => (exp.contributors || []).some(c => c.userId === currentUser?.uid)) || [];
-    const pendingInvitations = userExplanations.filter(exp => (exp.contributors || []).some(c => c.userId === currentUser?.uid && c.status === 'pending'));
+    const pendingInvitations = (explanations || []).filter(exp => 
+        (exp.contributors || []).some(c => c.userId === currentUser?.uid && c.status === 'pending')
+    );
 
     return (
         <Card>
@@ -262,6 +267,7 @@ export function ClassmatesDashboard({ classmates, explanations, currentUser, cla
                                 explanation={exp}
                                 currentUser={currentUser}
                                 classroomId={classroomId}
+                                classmates={classmates}
                             />
                         ))}
                     </div>
@@ -285,9 +291,9 @@ export function ClassmatesDashboard({ classmates, explanations, currentUser, cla
                     </div>
                 ) : (
                     classmates.map(student => {
-                        const studentExplanations = explanations
-                            ?.filter(exp => (exp.contributors || []).some(c => c.userId === student.uid && c.status === 'accepted'))
-                            .sort((a, b) => b.createdAt.toDate() - a.createdAt.toDate()) || [];
+                        const studentExplanations = (explanations || [])
+                            .filter(exp => (exp.contributors || []).some(c => c.userId === student.uid && c.status === 'accepted'))
+                            .sort((a, b) => b.createdAt.toDate() - a.createdAt.toDate());
 
                         return (
                             <div key={student.uid} className="flex items-start gap-4">
