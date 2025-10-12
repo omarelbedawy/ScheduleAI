@@ -65,21 +65,25 @@ export function ScheduleAnalyzer() {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const { toast } = useToast();
 
-  const userProfileQuery = useMemoFirebase(() => user ? doc(firestore, "users", user.uid) : null, [firestore, user]);
-  const { data: userProfile } = useDoc<UserProfile>(userProfileQuery);
+  const userProfileQuery = useMemoFirebase(() => user && firestore ? doc(firestore, "users", user.uid) : null, [firestore, user]);
+  const { data: userProfile, loading: userProfileLoading } = useDoc<UserProfile>(userProfileQuery);
 
   const classroomId = userProfile ? `${userProfile.grade}-${userProfile.class}` : null;
-  const classroomDocRef = useMemoFirebase(() => classroomId ? doc(firestore, 'classrooms', classroomId) : null, [firestore, classroomId]);
+  const classroomDocRef = useMemoFirebase(() => classroomId && firestore ? doc(firestore, 'classrooms', classroomId) : null, [firestore, classroomId]);
   const { data: classroomSchedule, loading: classroomLoading } = useDoc<ClassroomSchedule>(classroomDocRef);
+  
+  const isLoading = userProfileLoading || classroomLoading;
 
   useEffect(() => {
+    if (isLoading) return;
+    
     if (classroomSchedule?.schedule) {
       setEditableSchedule(JSON.parse(JSON.stringify(classroomSchedule.schedule)));
       setState("displaying");
-    } else if (!classroomLoading) {
+    } else {
       setState("idle");
     }
-  }, [classroomSchedule, classroomLoading]);
+  }, [classroomSchedule, isLoading]);
 
 
   const handleFileSelect = (selectedFile: File | null) => {
@@ -148,10 +152,10 @@ export function ScheduleAnalyzer() {
           updatedAt: serverTimestamp(),
         };
 
-        setDoc(classroomDocRef, newScheduleData).catch(async (serverError) => {
+        setDoc(classroomDocRef, newScheduleData, { merge: true }).catch(async (serverError) => {
           const permissionError = new FirestorePermissionError({
             path: classroomDocRef.path,
-            operation: 'create',
+            operation: 'update',
             requestResourceData: newScheduleData,
           } satisfies SecurityRuleContext);
           errorEmitter.emit('permission-error', permissionError);
@@ -225,7 +229,7 @@ export function ScheduleAnalyzer() {
     setTimeout(() => setIsCopied(false), 2000);
   };
 
-  if (state === "loading" || classroomLoading) {
+  if (state === "loading" || isLoading) {
     return <LoadingState />;
   }
 
