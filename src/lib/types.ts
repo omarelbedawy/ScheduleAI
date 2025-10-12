@@ -9,14 +9,25 @@ export interface UserProfile {
   class: 'a' | 'b' | 'c' | 'd' | 'e' | 'f';
 }
 
-export interface Explanation {
-  id: string;
+export interface ExplanationContributor {
   userId: string;
   userName: string;
+  status: 'pending' | 'accepted' | 'declined';
+}
+
+
+export interface Explanation {
+  id: string;
+  // userId: string; - Replaced by ownerId
+  // userName: string; - Replaced by contributors
+  ownerId: string;
+  contributors: ExplanationContributor[];
   subject: string;
   day: string;
   session: string;
-  learningOutcome?: number; // Optional now
+  learningOutcome?: number;
   concepts: string[];
+  explanationDate: any; // Firestore Timestamp
+  status: 'Upcoming' | 'Finished';
   createdAt: any; // Firestore timestamp
 }

@@ -27,15 +27,15 @@ import {
 } from "@/components/ui/select";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { cn } from "@/lib/utils";
-import { ArrowLeftRight, Split, Loader2, X } from "lucide-react";
-import React, { useState, KeyboardEvent } from 'react';
-import type { UserProfile, Explanation } from "@/lib/types";
+import { ArrowLeftRight, Split, Loader2, X, UserPlus, Send } from "lucide-react";
+import React, { useState, KeyboardEvent, useMemo } from 'react';
+import type { UserProfile, Explanation, ExplanationContributor } from "@/lib/types";
 import { Button } from "../ui/button";
 import { Label } from "../ui/label";
 import { Input } from "../ui/input";
 import { Badge } from "../ui/badge";
 import { useFirestore } from "@/firebase";
-import { collection, addDoc, serverTimestamp } from "firebase/firestore";
+import { collection, addDoc, serverTimestamp, query, where, getDocs } from "firebase/firestore";
 import { useToast } from "@/hooks/use-toast";
 import {
   Tooltip,
@@ -43,6 +43,12 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
+import { startOfWeek, addDays, nextDay } from 'date-fns';
 
 
 const subjectList = [
@@ -116,7 +122,7 @@ const SubjectDropdown = ({
   );
 };
 
-const ExplainDialog = ({ user, classroomId, day, session, subject, children, onOpenChange }: {
+const ExplainDialog = ({ user, classroomId, day, session, subject, children, onOpenChange, classmates }: {
   user: UserProfile;
   classroomId: string;
   day: string;
@@ -124,6 +130,7 @@ const ExplainDialog = ({ user, classroomId, day, session, subject, children, onO
   subject: string;
   children: React.ReactNode;
   onOpenChange: (open: boolean) => void;
+  classmates: UserProfile[] | null;
 }) => {
   const firestore = useFirestore();
   const { toast } = useToast();
@@ -131,8 +138,19 @@ const ExplainDialog = ({ user, classroomId, day, session, subject, children, onO
   const [learningOutcome, setLearningOutcome] = useState('');
   const [concepts, setConcepts] = useState<string[]>([]);
   const [currentConcept, setCurrentConcept] = useState('');
+  const [invited, setInvited] = useState<UserProfile[]>([]);
+  const [inviteSearch, setInviteSearch] = useState("");
 
   const isLanguage = languageSubjects.includes(subject);
+
+  const availableClassmates = useMemo(() => {
+    if (!classmates) return [];
+    return classmates.filter(
+      cm => cm.uid !== user.uid && !invited.some(i => i.uid === cm.uid) &&
+      (cm.name.toLowerCase().includes(inviteSearch.toLowerCase()) || 
+       cm.email.toLowerCase().includes(inviteSearch.toLowerCase()))
+    );
+  }, [classmates, user.uid, invited, inviteSearch]);
 
   const handleConceptKeyDown = (e: KeyboardEvent<HTMLInputElement>) => {
     if (e.key === 'Enter' && currentConcept.trim()) {
@@ -147,6 +165,29 @@ const ExplainDialog = ({ user, classroomId, day, session, subject, children, onO
   const removeConcept = (conceptToRemove: string) => {
     setConcepts(prev => prev.filter(c => c !== conceptToRemove));
   };
+  
+  const inviteClassmate = (classmate: UserProfile) => {
+    setInvited(prev => [...prev, classmate]);
+    setInviteSearch("");
+  };
+
+  const removeInvitation = (classmateToRemove: UserProfile) => {
+    setInvited(prev => prev.filter(c => c.uid !== classmateToRemove.uid));
+  };
+
+  const getExplanationDate = (day: string) => {
+    const dayMap: { [key: string]: number } = {
+      sunday: 0,
+      monday: 1,
+      tuesday: 2,
+      wednesday: 3,
+      thursday: 4,
+    };
+    const today = new Date();
+    // In Egypt, the week starts on Saturday. Let's use Sunday as start for date-fns.
+    const startOfThisWeek = startOfWeek(today, { weekStartsOn: 0 }); // 0 for Sunday
+    return addDays(startOfThisWeek, dayMap[day.toLowerCase()]);
+  }
 
   const handleSubmit = async () => {
     if ((!isLanguage && !learningOutcome) || concepts.length === 0 || !firestore || !classroomId) {
@@ -162,19 +203,25 @@ const ExplainDialog = ({ user, classroomId, day, session, subject, children, onO
 
     setIsLoading(true);
     try {
-      const explanationData: Omit<Explanation, 'id' | 'createdAt'> & { createdAt: any } = {
-        userId: user.uid,
-        userName: user.name,
+      const contributors: ExplanationContributor[] = [
+        { userId: user.uid, userName: user.name, status: 'accepted' },
+        ...invited.map(i => ({ userId: i.uid, userName: i.name, status: 'pending' as const }))
+      ];
+      
+      const explanationDate = getExplanationDate(day);
+
+      const explanationData = {
+        ownerId: user.uid,
+        contributors,
         subject,
         day,
         session,
         concepts,
+        explanationDate,
+        status: 'Upcoming' as const,
         createdAt: serverTimestamp(),
+        ...( !isLanguage && { learningOutcome: parseInt(learningOutcome, 10) })
       };
-
-      if (!isLanguage) {
-        explanationData.learningOutcome = parseInt(learningOutcome, 10);
-      }
       
       const explanationsColRef = collection(firestore, 'classrooms', classroomId, 'explanations');
       await addDoc(explanationsColRef, explanationData);
@@ -188,6 +235,7 @@ const ExplainDialog = ({ user, classroomId, day, session, subject, children, onO
       setLearningOutcome('');
       setConcepts([]);
       setCurrentConcept('');
+      setInvited([]);
       onOpenChange(false);
 
     } catch (error) {
@@ -206,11 +254,11 @@ const ExplainDialog = ({ user, classroomId, day, session, subject, children, onO
   return (
     <Dialog onOpenChange={onOpenChange}>
       <DialogTrigger asChild>{children}</DialogTrigger>
-      <DialogContent className="sm:max-w-[425px]">
+      <DialogContent className="sm:max-w-lg">
         <DialogHeader>
           <DialogTitle>I Will Explain: {subject}</DialogTitle>
           <DialogDescription>
-            Volunteer to explain a topic for this session. Your classmates will see your commitment.
+            Volunteer to explain a topic for this session. You can also invite classmates to join you.
           </DialogDescription>
         </DialogHeader>
         <div className="grid gap-4 py-4">
@@ -233,8 +281,8 @@ const ExplainDialog = ({ user, classroomId, day, session, subject, children, onO
               </Select>
             </div>
           )}
-          <div className="grid grid-cols-4 items-center gap-4">
-            <Label htmlFor="concepts-input" className="text-right">
+          <div className="grid grid-cols-4 items-start gap-4">
+            <Label htmlFor="concepts-input" className="text-right pt-2">
               Concepts
             </Label>
             <div className="col-span-3">
@@ -257,11 +305,67 @@ const ExplainDialog = ({ user, classroomId, day, session, subject, children, onO
                 <Input
                   id="concepts-input"
                   placeholder="Type a concept and press Enter"
-                  className="flex-1 border-0 shadow-none focus-visible:ring-0"
+                  className="h-auto flex-1 border-0 bg-transparent p-0 shadow-none focus-visible:ring-0"
                   value={currentConcept}
                   onChange={(e) => setCurrentConcept(e.target.value)}
                   onKeyDown={handleConceptKeyDown}
                 />
+              </div>
+            </div>
+          </div>
+
+           <div className="grid grid-cols-4 items-start gap-4">
+            <Label htmlFor="invite-input" className="text-right pt-2">
+              Invite
+            </Label>
+             <div className="col-span-3">
+              <Popover>
+                <PopoverTrigger asChild>
+                  <Input
+                    id="invite-input"
+                    placeholder="Search for a classmate by name..."
+                    className="flex-1"
+                    value={inviteSearch}
+                    onChange={(e) => setInviteSearch(e.target.value)}
+                  />
+                </PopoverTrigger>
+                <PopoverContent className="w-[var(--radix-popover-trigger-width)] p-0">
+                  <Command>
+                    <CommandInput placeholder="Search classmate..." />
+                    <CommandEmpty>No one found.</CommandEmpty>
+                    <CommandGroup>
+                      <ScrollArea className="h-32">
+                        {availableClassmates.map(c => (
+                          <CommandItem
+                            key={c.uid}
+                            onSelect={() => inviteClassmate(c)}
+                            className="cursor-pointer"
+                          >
+                            {c.name}
+                          </CommandItem>
+                        ))}
+                      </ScrollArea>
+                    </CommandGroup>
+                  </Command>
+                </PopoverContent>
+              </Popover>
+
+              <div className="mt-2 flex flex-wrap gap-2">
+                {invited.map(c => (
+                  <Badge
+                    key={c.uid}
+                    variant="outline"
+                    className="flex items-center gap-1"
+                  >
+                    {c.name}
+                    <button
+                      onClick={() => removeInvitation(c)}
+                      className="rounded-full hover:bg-muted-foreground/20"
+                    >
+                      <X className="h-3 w-3" />
+                    </button>
+                  </Badge>
+                ))}
               </div>
             </div>
           </div>
@@ -282,7 +386,16 @@ const ExplainDialog = ({ user, classroomId, day, session, subject, children, onO
   )
 }
 
-export function SubjectCell({ subject, isEditing, onChange, user, classroomId, day, session, explanations }: {
+import {
+  Command,
+  CommandEmpty,
+  CommandGroup,
+  CommandInput,
+  CommandItem,
+} from "@/components/ui/command";
+
+
+export function SubjectCell({ subject, isEditing, onChange, user, classroomId, day, session, explanations, classmates }: {
   subject: string;
   isEditing: boolean;
   onChange: (newSubject: string) => void;
@@ -291,6 +404,7 @@ export function SubjectCell({ subject, isEditing, onChange, user, classroomId, d
   day: string;
   session: string;
   explanations: Explanation[];
+  classmates: UserProfile[] | null;
 }) {
   const isSplit = subject.includes("/");
   const [dialogOpen, setDialogOpen] = useState(false);
@@ -365,11 +479,11 @@ export function SubjectCell({ subject, isEditing, onChange, user, classroomId, d
             <Tooltip>
               <TooltipTrigger asChild>
                 <div className="absolute top-1 right-1 flex items-center justify-center h-4 w-4 rounded-full bg-accent text-accent-foreground text-[10px] font-bold">
-                  {partExplanations.length}
+                  {partExplanations.reduce((acc, exp) => acc + exp.contributors.filter(c => c.status === 'accepted').length, 0)}
                 </div>
               </TooltipTrigger>
               <TooltipContent>
-                <p>{partExplanations.length} student(s) will explain this.</p>
+                 <p>{partExplanations.reduce((acc, exp) => acc + exp.contributors.filter(c => c.status === 'accepted').length, 0)} student(s) will explain this.</p>
               </TooltipContent>
             </Tooltip>
            </TooltipProvider>
@@ -390,6 +504,7 @@ export function SubjectCell({ subject, isEditing, onChange, user, classroomId, d
           session={session}
           subject={subjectPart}
           onOpenChange={setDialogOpen}
+          classmates={classmates}
         >
           {cellWrapper}
         </ExplainDialog>

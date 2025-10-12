@@ -1,3 +1,4 @@
+
 "use client";
 
 import type { AnalyzeScheduleFromImageOutput } from "@/ai/flows/analyze-schedule-from-image";
@@ -18,6 +19,7 @@ export function ScheduleTable({
   user,
   classroomId,
   explanations,
+  classmates,
 }: {
   scheduleData: ScheduleData;
   isEditing?: boolean;
@@ -25,6 +27,7 @@ export function ScheduleTable({
   user: UserProfile | null;
   classroomId: string | null;
   explanations: Explanation[];
+  classmates: UserProfile[] | null;
 }) {
   if (!scheduleData) return null;
 
@@ -76,6 +79,7 @@ export function ScheduleTable({
                   day={day}
                   session={row.session}
                   explanations={cellExplanations}
+                  classmates={classmates}
                 />
               )
             })}

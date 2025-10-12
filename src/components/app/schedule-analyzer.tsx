@@ -30,12 +30,13 @@ import Image from "next/image";
 import { ScheduleTable } from "./schedule-table";
 import { useUser } from "@/firebase/auth/use-user";
 import { useFirestore, useDoc, useMemoFirebase, useCollection } from "@/firebase";
-import { doc, setDoc, serverTimestamp, collection, query, where } from "firebase/firestore";
+import { doc, setDoc, serverTimestamp, collection, query, where, getDocs, writeBatch, Timestamp } from "firebase/firestore";
 import type { UserProfile, Explanation } from "@/lib/types";
 import { errorEmitter } from "@/firebase/error-emitter";
 import { FirestorePermissionError, type SecurityRuleContext } from "@/firebase/errors";
 import { schoolList } from "@/lib/schools";
 import { ClassmatesDashboard } from "./classmates-dashboard";
+import { startOfWeek, isBefore, endOfWeek } from 'date-fns';
 
 type AnalysisState = "idle" | "previewing" | "loading" | "displaying" | "initializing";
 type ScheduleRow = AnalyzeScheduleFromImageOutput["schedule"][number];
@@ -95,6 +96,45 @@ export function ScheduleAnalyzer() {
   const { data: explanations, loading: explanationsLoading } = useCollection<Explanation>(explanationsQuery);
 
   const isLoading = userLoading || userProfileLoading || classroomLoading || classmatesLoading || explanationsLoading;
+
+
+  // Effect for archiving old explanations
+  useEffect(() => {
+    if (!firestore || !classroomId || explanationsLoading || !explanations) return;
+
+    const archivePastExplanations = async () => {
+      const today = new Date();
+      // Using Saturday as the end of the week.
+      const endOfLastWeek = endOfWeek(today, { weekStartsOn: 0 }); // Sunday as start of week
+      
+      const upcomingExplanations = explanations.filter(exp => exp.status === 'Upcoming');
+      const pastExplanations = upcomingExplanations.filter(exp => {
+        const expDate = (exp.explanationDate as Timestamp)?.toDate();
+        return expDate && isBefore(expDate, endOfLastWeek);
+      });
+
+      if (pastExplanations.length > 0) {
+        console.log(`Archiving ${pastExplanations.length} explanations...`);
+        const batch = writeBatch(firestore);
+        pastExplanations.forEach(exp => {
+          const expRef = doc(firestore, 'classrooms', classroomId, 'explanations', exp.id);
+          batch.update(expRef, { status: 'Finished' });
+        });
+        try {
+          await batch.commit();
+          toast({
+            title: "Weekly Cleanup",
+            description: "Past explanation commitments have been archived."
+          });
+        } catch (error) {
+          console.error("Failed to archive explanations:", error);
+        }
+      }
+    };
+    // Run this check once on load
+    archivePastExplanations();
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [firestore, classroomId, explanationsLoading]);
 
 
   useEffect(() => {
@@ -457,6 +497,7 @@ function ResultState({ user, classroomId, classroomSchedule, editableSchedule, c
             user={user}
             classroomId={classroomId}
             explanations={explanations || []}
+            classmates={classmates}
           />
         ) : (
           <div className="rounded-md border bg-muted p-4">
