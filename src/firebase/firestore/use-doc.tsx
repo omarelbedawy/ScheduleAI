@@ -20,7 +20,8 @@ export function useDoc<T>(pathOrRef: string | DocumentReference | null): UseDocS
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    if (!pathOrRef) {
+    // Do not run if firestore is not yet available.
+    if (!firestore || !pathOrRef) {
       setData(null);
       setLoading(false);
       return;
