@@ -1,14 +1,26 @@
 /**
- * @file Firestore Security Rules
- * @description This ruleset enforces a strict user-ownership model for user profiles and allows any authenticated user to update classroom schedules.
+ * @fileoverview Firestore Security Rules for Prototyping.
+ *
+ * Core Philosophy:
+ * This ruleset prioritizes security by enforcing strict user-ownership for user profiles
+ * and allowing public read access to classroom schedules, while restricting write access to those.
+ * It opts for simplicity and security over complex schema validation to enable rapid prototyping.
  *
  * Data Structure:
- * - /users/{userId}: Stores public profile information for each user. Access is restricted to the owner.
- * - /classrooms/{classroomId}: Stores the shared schedule for a classroom. Any authenticated user can update these schedules.
+ * - /users/{userId}: Stores user profile data. Access is restricted to the owner (the user with matching userId).
+ * - /classrooms/{classroomId}: Stores classroom schedules. Publicly readable, but only writeable to authorized users.
  *
  * Key Security Decisions:
- * - User profiles are strictly private and owned by the respective user.
- * - Any authenticated user can update classroom schedules.
+ * - User profiles are strictly private; listing all profiles is disallowed.
+ * - Classroom schedules are publicly readable, allowing all clients to fetch them.
+ * - No write access is granted.
+ *
+ * Denormalization for Authorization:
+ *  - No denormalization is used in this ruleset. If write access were to be granted, consider adding an
+ *    `ownerId` or `authorizedEditorIds` field to the classroom documents to simplify authorization rules
+ *    and avoid costly `get()` calls.
+ * Structural Segregation:
+ * - Public data (classroom schedules) and private data (user profiles) are stored in separate top-level collections.
  */
 rules_version = '2';
 service cloud.firestore {
@@ -17,47 +29,50 @@ service cloud.firestore {
     /**
      * @description Controls access to user profile documents.
      * @path /users/{userId}
-     * @allow (create) User 'testUser' with ID 'testUser' can create their own profile.
-     * @allow (get, list) User 'testUser' with ID 'testUser' can read their own profile.
-     * @allow (update, delete) User 'testUser' with ID 'testUser' can update/delete their own profile.
-     * @deny (create) User 'anotherUser' with ID 'anotherUser' cannot create a profile for 'testUser'.
-     * @deny (get, list) User 'anotherUser' with ID 'anotherUser' cannot read the 'testUser' profile.
-     * @deny (update, delete) User 'anotherUser' with ID 'anotherUser' cannot update/delete the 'testUser' profile.
-     * @principle Enforces document ownership for all operations on user profiles.
+     * @allow (create) User with UID 'user_abc' can create their own profile at /users/user_abc.
+     * @allow (get, update, delete) User with UID 'user_abc' can read, update, and delete their own profile at /users/user_abc.
+     * @deny (create) User with UID 'user_abc' cannot create a profile at /users/user_xyz.
+     * @deny (get, update, delete) User with UID 'user_abc' cannot read, update, or delete another user's profile at /users/user_xyz.
+     * @principle Enforces document ownership for user profiles.
      */
     match /users/{userId} {
-      function isOwner(userId) {
-        return request.auth.uid == userId;
-      }
-
-      function isSignedIn() {
-        return request.auth != null;
-      }
-
-      allow get, list: if isOwner(userId);
-      allow create: if isOwner(userId);
-      allow update: if isOwner(userId) && resource.data.id == userId;
-      allow delete: if isOwner(userId) && resource != null;
+      // Allow a user to create their own profile if the userId matches their auth UID.
+      allow create: if isSignedIn() && isOwner(userId) && request.resource.data.email == request.auth.token.email;
+      // Allow reading, updating, and deleting a profile only by the owner.
+      allow get, update, delete: if isSignedIn() && isExistingOwner(userId);
+      // No listing of all users.
+      allow list: if false;
     }
 
     /**
      * @description Controls access to classroom schedule documents.
      * @path /classrooms/{classroomId}
-     * @allow (get, list) Any user can read the schedule.
-     * @allow (update) Any authenticated user can update the schedule.
-     * @deny (create) No one can create a classroom document (explicitly managed by backend).
-     * @deny (delete) No one can delete a classroom document (explicitly managed by backend).
-     * @principle Allows any signed-in user to read or update classroom schedules, but restricts creation and deletion.
+     * @allow (get, list) Any user can read classroom schedules.
+     * @deny (create, update, delete) No user can create, update, or delete classroom schedules (write permissions are disabled).
+     * @principle Allows public read access to classroom schedules.
      */
     match /classrooms/{classroomId} {
-      function isSignedIn() {
-        return request.auth != null;
-      }
-
+      // Allow anyone to read classroom schedules.
       allow get, list: if true;
-      allow create: if false;
-      allow update: if isSignedIn() && resource != null;
-      allow delete: if false;
+      // No one can create, update, or delete classroom schedules.
+      allow create, update, delete: if false;
+    }
+
+    // --- Helper functions ---
+
+    // Checks if the user is signed in.
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    // Checks if the requesting user is the owner of the document, based on the userId.
+    function isOwner(userId) {
+      return request.auth.uid == userId;
+    }
+
+    //Check if the requesting user is the owner of an existing document
+    function isExistingOwner(userId){
+        return isOwner(userId) && resource != null;
     }
   }
 }
