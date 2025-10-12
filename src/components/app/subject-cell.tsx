@@ -405,7 +405,7 @@ export function SubjectCell({ subject, isEditing, onChange, user, classroomId, d
         <>
           {renderCellContent(subject, 'first')}
           <div className="h-px bg-border/50 w-full" />
-          {renderCell-cellContent(subject, 'second')}
+          {renderCellContent(subject, 'second')}
         </>
       ) : (
         renderCellContent(subject, 'first')
@@ -428,5 +428,3 @@ export function SubjectCell({ subject, isEditing, onChange, user, classroomId, d
 
   return <div>{cellStructure}</div>;
 }
-
-    
