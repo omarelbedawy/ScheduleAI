@@ -32,6 +32,8 @@ import { useFirestore } from "@/firebase";
 import { useToast } from "@/hooks/use-toast";
 import { Loader2 } from "lucide-react";
 import { useState } from "react";
+import { FirestorePermissionError, type SecurityRuleContext } from "@/firebase/errors";
+import { errorEmitter } from "@/firebase/error-emitter";
 
 const formSchema = z.object({
   name: z.string().min(2, "Name must be at least 2 characters."),
@@ -74,7 +76,16 @@ export default function SignUpPage() {
         class: values.class,
       };
 
-      await setDoc(doc(firestore, "users", user.uid), userProfile);
+      const userDocRef = doc(firestore, "users", user.uid);
+      
+      setDoc(userDocRef, userProfile).catch(async (serverError) => {
+        const permissionError = new FirestorePermissionError({
+          path: userDocRef.path,
+          operation: 'create',
+          requestResourceData: userProfile,
+        } satisfies SecurityRuleContext);
+        errorEmitter.emit('permission-error', permissionError);
+      });
       
       toast({
         title: "Account Created",
@@ -190,7 +201,7 @@ export default function SignUpPage() {
                         <FormControl>
                           <SelectTrigger>
                             <SelectValue placeholder="Class" />
-                          </SelectTrigger>
+                          </Trigger>
                         </FormControl>
                         <SelectContent>
                           {['a', 'b', 'c', 'd', 'e', 'f'].map(c => (
