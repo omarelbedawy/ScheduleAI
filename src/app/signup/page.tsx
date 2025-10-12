@@ -232,7 +232,7 @@ export default function SignUpPage() {
                         <FormControl>
                           <SelectTrigger>
                             <SelectValue placeholder="Class" />
-                          </Trigger>
+                          </SelectTrigger>
                         </FormControl>
                         <SelectContent>
                           {['a', 'b', 'c', 'd', 'e', 'f'].map(c => (
