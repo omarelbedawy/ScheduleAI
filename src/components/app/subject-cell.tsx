@@ -16,6 +16,7 @@ import {
   DialogTitle,
   DialogFooter,
   DialogClose,
+  DialogTrigger,
 } from "@/components/ui/dialog";
 import {
   Select,
@@ -404,7 +405,7 @@ export function SubjectCell({ subject, isEditing, onChange, user, classroomId, d
         <>
           {renderCellContent(subject, 'first')}
           <div className="h-px bg-border/50 w-full" />
-          {renderCellContent(subject, 'second')}
+          {renderCell-cellContent(subject, 'second')}
         </>
       ) : (
         renderCellContent(subject, 'first')
@@ -427,3 +428,5 @@ export function SubjectCell({ subject, isEditing, onChange, user, classroomId, d
 
   return <div>{cellStructure}</div>;
 }
+
+    
