@@ -99,7 +99,7 @@ export default function SignUpPage() {
       router.push("/");
 
     } catch (error: any) {
-      console.error("Sign up error:", error);
+      // Don't log the auth error with console.error, toast is enough
       toast({
         variant: "destructive",
         title: "Sign Up Failed",
