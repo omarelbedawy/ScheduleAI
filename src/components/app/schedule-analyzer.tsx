@@ -59,44 +59,39 @@ export function ScheduleAnalyzer() {
   const { toast } = useToast();
 
   const userProfileQuery = useMemoFirebase(() => {
-    // IMPORTANT: Do not create the query until the user is authenticated
     if (!firestore || !user?.uid) return null;
     return doc(firestore, "users", user.uid);
   }, [firestore, user]);
   const { data: userProfile, loading: userProfileLoading } = useDoc<UserProfile>(userProfileQuery);
 
   const classroomId = useMemoFirebase(() => {
-    // Wait for user profile to be loaded
     if (!userProfile) return null;
     return `${userProfile.grade}-${userProfile.class}`;
   }, [userProfile]);
   
   const classroomDocRef = useMemoFirebase(() => {
-    // Wait for firestore and a valid classroomId
     if (!firestore || !classroomId) return null;
     return doc(firestore, 'classrooms', classroomId);
   }, [firestore, classroomId]);
   const { data: classroomSchedule, loading: classroomLoading } = useDoc<ClassroomSchedule>(classroomDocRef);
 
   useEffect(() => {
-    // This effect now correctly handles the various loading and data states
-    const isLoading = userLoading || userProfileLoading || classroomLoading;
+    const isComponentLoading = userLoading || userProfileLoading || classroomLoading;
     
-    // While any data is loading, show the initializing screen.
-    // But don't change state if we are in the middle of an AI analysis.
-    if (isLoading && state !== 'loading') {
-      setState("initializing");
+    // Only show initializing screen on initial load
+    if (isComponentLoading && state === 'initializing') {
       return;
     }
     
-    // After all loading is done:
-    // If a classroom schedule exists, display it.
-    if (classroomSchedule && classroomSchedule.schedule && classroomSchedule.schedule.length > 0) {
-      setEditableSchedule(JSON.parse(JSON.stringify(classroomSchedule.schedule)));
-      setState("displaying");
-    } else if (!isLoading) {
-      // If everything is loaded and there's still no schedule, prompt to upload.
-      setState("idle");
+    // Once everything is loaded...
+    if (!isComponentLoading) {
+      if (classroomSchedule && classroomSchedule.schedule && classroomSchedule.schedule.length > 0) {
+        setEditableSchedule(JSON.parse(JSON.stringify(classroomSchedule.schedule)));
+        setState("displaying");
+      } else {
+        // If there's no schedule, go to idle to allow upload.
+        setState("idle");
+      }
     }
   }, [userLoading, userProfileLoading, classroomLoading, classroomSchedule, state]);
 
@@ -140,7 +135,6 @@ export function ScheduleAnalyzer() {
     if (previewUrl) URL.revokeObjectURL(previewUrl);
     setFile(null);
     setPreviewUrl(null);
-    // Determine the correct "reset" state. If there was a schedule, go back to displaying it.
     if (classroomSchedule?.schedule && classroomSchedule.schedule.length > 0) {
         setEditableSchedule(JSON.parse(JSON.stringify(classroomSchedule.schedule)));
         setState("displaying");
@@ -269,74 +263,81 @@ export function ScheduleAnalyzer() {
     );
   }
 
-  return (
-    <Card
-      className={cn(
-        "border-2 border-dashed transition-colors",
-        isDragging && "border-primary bg-primary/10"
-      )}
-      onDragOver={onDragOver}
-      onDragLeave={onDragLeave}
-      onDrop={onDrop}
-    >
-      <CardHeader>
-        <CardTitle>No Schedule Found</CardTitle>
-        <CardDescription>Your class doesn't have a schedule yet. Upload one to get started!</CardDescription>
-      </CardHeader>
-      <CardContent className="p-6">
-        <input
-          type="file"
-          ref={fileInputRef}
-          onChange={onFileChange}
-          className="hidden"
-          accept="image/*"
-        />
-        {state === "idle" && (
-          <div className="flex flex-col items-center justify-center space-y-4 py-16 text-center">
-            <div className="rounded-full border border-dashed bg-secondary p-4">
-              <UploadCloud className="size-10 text-muted-foreground" />
-            </div>
-            <p className="text-muted-foreground">
-              Drag & drop your schedule image here, or
-            </p>
-            <Button
-              onClick={() => fileInputRef.current?.click()}
-              className="bg-accent text-accent-foreground hover:bg-accent/90"
-            >
-              Browse Files
-            </Button>
-          </div>
+  // This is the "empty" state, where no schedule exists for the class.
+  // It handles both the initial idle state and the previewing state.
+  if (state === "idle" || state === "previewing") {
+    return (
+      <Card
+        className={cn(
+          "border-2 border-dashed transition-colors",
+          isDragging && "border-primary bg-primary/10"
         )}
-        {state === "previewing" && previewUrl && (
-          <div className="flex flex-col items-center gap-6">
-            <div className="relative w-full max-w-md rounded-lg border p-2 shadow-sm">
-              <Image
-                src={previewUrl}
-                alt="Schedule preview"
-                width={600}
-                height={400}
-                className="max-h-80 w-full rounded-md object-contain"
-              />
+        onDragOver={onDragOver}
+        onDragLeave={onDragLeave}
+        onDrop={onDrop}
+      >
+        <CardHeader>
+          <CardTitle>No Schedule Found</CardTitle>
+          <CardDescription>Your class doesn't have a schedule yet. Upload one to get started!</CardDescription>
+        </CardHeader>
+        <CardContent className="p-6">
+          <input
+            type="file"
+            ref={fileInputRef}
+            onChange={onFileChange}
+            className="hidden"
+            accept="image/*"
+          />
+          {state === "idle" && (
+            <div className="flex flex-col items-center justify-center space-y-4 py-16 text-center">
+              <div className="rounded-full border border-dashed bg-secondary p-4">
+                <UploadCloud className="size-10 text-muted-foreground" />
+              </div>
+              <p className="text-muted-foreground">
+                Drag & drop your schedule image here, or
+              </p>
               <Button
-                variant="ghost"
-                size="icon"
-                className="absolute right-3 top-3 h-8 w-8 rounded-full bg-background/70 hover:bg-background"
-                onClick={onReset}
+                onClick={() => fileInputRef.current?.click()}
+                className="bg-accent text-accent-foreground hover:bg-accent/90"
               >
-                <X className="size-4" />
+                Browse Files
               </Button>
             </div>
-            <Button
-              onClick={onSubmit}
-              className="w-full max-w-md bg-accent text-accent-foreground hover:bg-accent/90"
-            >
-              Analyze Schedule
-            </Button>
-          </div>
-        )}
-      </CardContent>
-    </Card>
-  );
+          )}
+          {state === "previewing" && previewUrl && (
+            <div className="flex flex-col items-center gap-6">
+              <div className="relative w-full max-w-md rounded-lg border p-2 shadow-sm">
+                <Image
+                  src={previewUrl}
+                  alt="Schedule preview"
+                  width={600}
+                  height={400}
+                  className="max-h-80 w-full rounded-md object-contain"
+                />
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="absolute right-3 top-3 h-8 w-8 rounded-full bg-background/70 hover:bg-background"
+                  onClick={onReset}
+                >
+                  <X className="size-4" />
+                </Button>
+              </div>
+              <Button
+                onClick={onSubmit}
+                className="w-full max-w-md bg-accent text-accent-foreground hover:bg-accent/90"
+              >
+                Analyze Schedule
+              </Button>
+            </div>
+          )}
+        </CardContent>
+      </Card>
+    );
+  }
+
+  // Fallback for any other state, essentially a loading state
+  return <LoadingState isAnalyzing={false} />;
 }
 
 function LoadingState({ isAnalyzing }: { isAnalyzing: boolean }) {
@@ -451,5 +452,3 @@ function ResultState({ classroomSchedule, editableSchedule, onCopy, isCopied, on
     </Card>
   );
 }
-
-    
