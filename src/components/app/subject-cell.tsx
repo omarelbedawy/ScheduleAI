@@ -479,11 +479,11 @@ export function SubjectCell({ subject, isEditing, onChange, user, classroomId, d
             <Tooltip>
               <TooltipTrigger asChild>
                 <div className="absolute top-1 right-1 flex items-center justify-center h-4 w-4 rounded-full bg-accent text-accent-foreground text-[10px] font-bold">
-                  {partExplanations.reduce((acc, exp) => acc + exp.contributors.filter(c => c.status === 'accepted').length, 0)}
+                  {partExplanations.reduce((acc, exp) => acc + (exp.contributors || []).filter(c => c.status === 'accepted').length, 0)}
                 </div>
               </TooltipTrigger>
               <TooltipContent>
-                 <p>{partExplanations.reduce((acc, exp) => acc + exp.contributors.filter(c => c.status === 'accepted').length, 0)} student(s) will explain this.</p>
+                 <p>{partExplanations.reduce((acc, exp) => acc + (exp.contributors || []).filter(c => c.status === 'accepted').length, 0)} student(s) will explain this.</p>
               </TooltipContent>
             </Tooltip>
            </TooltipProvider>
