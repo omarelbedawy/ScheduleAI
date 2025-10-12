@@ -236,7 +236,7 @@ function DeleteAllDialog({ classroomId }: { classroomId: string | null }) {
     const { toast } = useToast();
     const [password, setPassword] = useState("");
     const [isOpen, setIsOpen] = useState(false);
-    const correctPassword = "OmarElbedawyistheonlyadmin";
+    const correctPassword = "Iamtheonlyadminonearth";
 
     const handleDeleteAll = async () => {
         if (password !== correctPassword) {
@@ -423,5 +423,7 @@ export function ClassmatesDashboard({ classmates, explanations, currentUser, cla
         </Card>
     );
 }
+
+    
 
     
