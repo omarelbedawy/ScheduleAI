@@ -27,7 +27,7 @@ import {
 } from "@/components/ui/select";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { cn } from "@/lib/utils";
-import { ArrowLeftRight, Split, Loader2, X } from "lucide-react";
+import { ArrowLeftRight, Split, Loader2, X, CalendarIcon } from "lucide-react";
 import React, { useState, KeyboardEvent, useMemo } from 'react';
 import type { UserProfile, Explanation, ExplanationContributor } from "@/lib/types";
 import { Button } from "../ui/button";
@@ -48,7 +48,8 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from "@/components/ui/popover";
-import { startOfWeek, addDays } from 'date-fns';
+import { format } from 'date-fns';
+import { Calendar } from "@/components/ui/calendar";
 
 
 const subjectList = [
@@ -140,6 +141,7 @@ const ExplainDialog = ({ user, classroomId, day, session, subject, children, onO
   const [currentConcept, setCurrentConcept] = useState('');
   const [invited, setInvited] = useState<UserProfile[]>([]);
   const [inviteSearch, setInviteSearch] = useState("");
+  const [explanationDate, setExplanationDate] = useState<Date | undefined>();
 
   const isLanguage = languageSubjects.includes(subject);
 
@@ -174,22 +176,21 @@ const ExplainDialog = ({ user, classroomId, day, session, subject, children, onO
   const removeInvitation = (classmateToRemove: UserProfile) => {
     setInvited(prev => prev.filter(c => c.uid !== classmateToRemove.uid));
   };
-
-  const getExplanationDate = (day: string) => {
-    const dayMap: { [key: string]: number } = {
-      sunday: 0,
-      monday: 1,
-      tuesday: 2,
-      wednesday: 3,
-      thursday: 4,
-    };
-    const today = new Date();
-    // In Egypt, the week starts on Saturday. Let's use Sunday as start for date-fns.
-    const startOfThisWeek = startOfWeek(today, { weekStartsOn: 0 }); // 0 for Sunday
-    return addDays(startOfThisWeek, dayMap[day.toLowerCase()]);
+  
+  const dayNameToIndex = (day: string) => {
+    const map: { [key: string]: number } = { sunday: 0, monday: 1, tuesday: 2, wednesday: 3, thursday: 4, friday: 5, saturday: 6 };
+    return map[day.toLowerCase()];
   }
 
   const handleSubmit = async () => {
+    if (!explanationDate) {
+      toast({
+        variant: "destructive",
+        title: "Missing Date",
+        description: "Please select a date for your explanation.",
+      });
+      return;
+    }
     if ((!isLanguage && !learningOutcome) || concepts.length === 0 || !firestore || !classroomId) {
       toast({
         variant: "destructive",
@@ -208,8 +209,6 @@ const ExplainDialog = ({ user, classroomId, day, session, subject, children, onO
         ...invited.map(i => ({ userId: i.uid, userName: i.name, status: 'pending' as const }))
       ];
       
-      const explanationDate = getExplanationDate(day);
-
       const explanationData = {
         ownerId: user.uid,
         contributors,
@@ -236,6 +235,7 @@ const ExplainDialog = ({ user, classroomId, day, session, subject, children, onO
       setConcepts([]);
       setCurrentConcept('');
       setInvited([]);
+      setExplanationDate(undefined);
       onOpenChange(false);
 
     } catch (error) {
@@ -262,6 +262,38 @@ const ExplainDialog = ({ user, classroomId, day, session, subject, children, onO
           </DialogDescription>
         </DialogHeader>
         <div className="grid gap-4 py-4">
+          <div className="grid grid-cols-4 items-center gap-4">
+            <Label htmlFor="date" className="text-right">
+              Date
+            </Label>
+            <Popover>
+              <PopoverTrigger asChild>
+                <Button
+                  variant={"outline"}
+                  className={cn(
+                    "col-span-3 justify-start text-left font-normal",
+                    !explanationDate && "text-muted-foreground"
+                  )}
+                >
+                  <CalendarIcon className="mr-2 h-4 w-4" />
+                  {explanationDate ? format(explanationDate, "PPP") : <span>Pick a date</span>}
+                </Button>
+              </PopoverTrigger>
+              <PopoverContent className="w-auto p-0">
+                <Calendar
+                  mode="single"
+                  selected={explanationDate}
+                  onSelect={setExplanationDate}
+                  disabled={(date) => {
+                    const today = new Date();
+                    today.setHours(0, 0, 0, 0);
+                    return date < today || date.getDay() !== dayNameToIndex(day);
+                  }}
+                  initialFocus
+                />
+              </PopoverContent>
+            </Popover>
+          </div>
           {!isLanguage && (
             <div className="grid grid-cols-4 items-center gap-4">
               <Label htmlFor="lo-select" className="text-right">
@@ -545,5 +577,3 @@ export function SubjectCell({ subject, isEditing, onChange, user, classroomId, d
 
   return <div>{cellStructure}</div>;
 }
-
-    
