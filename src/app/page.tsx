@@ -11,6 +11,7 @@ import { useFirestore, useDoc, useMemoFirebase } from "@/firebase";
 import type { UserProfile } from "@/lib/types";
 import { doc } from "firebase/firestore";
 import { TeacherDashboard } from "@/components/app/teacher-dashboard";
+import { AdminDashboard } from "@/components/app/admin-dashboard";
 
 export default function Home() {
   const { user, loading: userLoading } = useUser();
@@ -58,8 +59,7 @@ export default function Home() {
         <div className="min-h-screen bg-background text-foreground">
          <Header />
          <main className="container mx-auto px-4 pb-12">
-            <h1 className="text-3xl font-bold my-6">Admin Dashboard</h1>
-            <p>Welcome, {userProfile.name}! Your admin dashboard is under construction.</p>
+            <AdminDashboard admin={userProfile} />
          </main>
         </div>
     )

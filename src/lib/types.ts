@@ -36,5 +36,6 @@ export interface Explanation {
   concepts: string[];
   explanationDate: any; // Firestore Timestamp
   status: 'Upcoming' | 'Finished';
+  completionStatus?: 'pending' | 'explained' | 'not-explained';
   createdAt: any; // Firestore timestamp
 }

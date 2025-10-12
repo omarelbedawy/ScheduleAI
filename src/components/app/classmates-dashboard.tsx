@@ -5,7 +5,7 @@ import type { UserProfile, Explanation, ExplanationContributor } from "@/lib/typ
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Users, BookUser, CalendarDays, Clock, Trash2, Check, X, Hourglass, ThumbsUp, ThumbsDown } from "lucide-react";
+import { Users, BookUser, CalendarDays, Clock, Trash2, Check, X, Hourglass, ThumbsUp, ThumbsDown, CheckCircle, XCircle, HelpCircle } from "lucide-react";
 import { Badge } from "../ui/badge";
 import { Button } from "../ui/button";
 import {
@@ -136,7 +136,8 @@ function ExplanationCard({
     const { toast } = useToast();
 
     const isOwner = currentUser?.uid === explanation.ownerId;
-    
+    const isTeacher = currentUser?.role === 'teacher';
+
     const createdAtDate = explanation.createdAt?.toDate();
     const timeAgo = createdAtDate ? formatDistanceToNow(createdAtDate, { addSuffix: true }) : 'a while ago';
     
@@ -144,6 +145,22 @@ function ExplanationCard({
     const fullDate = explanationDate ? format(explanationDate, 'EEEE, MMMM d') : explanation.day.charAt(0).toUpperCase() + explanation.day.slice(1);
 
     const loText = explanation.learningOutcome ? ` - LO ${explanation.learningOutcome}` : '';
+
+    const handleCompletionStatus = async (status: 'explained' | 'not-explained') => {
+        if (!firestore || !classroomId || !isTeacher) return;
+        const explanationRef = doc(firestore, 'classrooms', classroomId, 'explanations', explanation.id);
+        try {
+            await updateDoc(explanationRef, { completionStatus: status });
+            toast({
+                title: 'Status Updated',
+                description: `Marked as ${status === 'explained' ? 'Explained' : 'Not Explained'}.`
+            });
+        } catch (error) {
+            console.error('Error updating completion status:', error);
+            toast({ variant: 'destructive', title: 'Error', description: 'Could not update status.'});
+        }
+    };
+
 
     const handleDelete = async () => {
         if (!firestore || !classroomId || !explanation.id) {
@@ -172,11 +189,26 @@ function ExplanationCard({
         }
     }
 
+    const CompletionStatusIcon = () => {
+        switch (explanation.completionStatus) {
+            case 'explained':
+                return <TooltipProvider><Tooltip><TooltipTrigger asChild><CheckCircle className="size-4 text-green-500" /></TooltipTrigger><TooltipContent><p>Explained</p></TooltipContent></Tooltip></TooltipProvider>;
+            case 'not-explained':
+                return <TooltipProvider><Tooltip><TooltipTrigger asChild><XCircle className="size-4 text-red-500" /></TooltipTrigger><TooltipContent><p>Not Explained</p></TooltipContent></Tooltip></TooltipProvider>;
+            default:
+                 return <TooltipProvider><Tooltip><TooltipTrigger asChild><HelpCircle className="size-4 text-muted-foreground" /></TooltipTrigger><TooltipContent><p>Pending Teacher Feedback</p></TooltipContent></Tooltip></TooltipProvider>;
+        }
+    }
+
     return (
         <Card className="bg-card/50 relative group">
-             <div className="absolute top-2 right-2 flex items-center gap-1">
-                 {explanation.status === 'Upcoming' && <Badge variant="outline" className="border-green-500 text-green-500"><Check className="mr-1 h-3 w-3"/> Upcoming</Badge>}
-                {explanation.status === 'Finished' && <Badge variant="outline"><Check className="mr-1 h-3 w-3"/> Finished</Badge>}
+             <div className="absolute top-2 right-2 flex items-center gap-2">
+                {explanation.status === 'Finished' && <CompletionStatusIcon />}
+
+                {explanation.status === 'Upcoming' 
+                    ? <Badge variant="outline" className="border-green-500 text-green-500"><Check className="mr-1 h-3 w-3"/> Upcoming</Badge>
+                    : <Badge variant="outline"><Clock className="mr-1 h-3 w-3"/> Finished</Badge>
+                }
                 
                 {isOwner && explanation.status === 'Upcoming' && (
                     <AlertDialog>
@@ -226,6 +258,17 @@ function ExplanationCard({
                     ))}
                 </div>
                 <ContributorList contributors={explanation.contributors} />
+                {isTeacher && explanation.status === 'Finished' && (
+                    <div className="flex items-center justify-end gap-2 pt-2 border-t mt-3">
+                        <span className="text-xs text-muted-foreground">Was it explained?</span>
+                        <Button size="icon" variant="outline" className="h-7 w-7 hover:bg-green-100 dark:hover:bg-green-900" onClick={() => handleCompletionStatus('explained')}>
+                            <Check className="size-4 text-green-600" />
+                        </Button>
+                        <Button size="icon" variant="outline" className="h-7 w-7 hover:bg-red-100 dark:hover:bg-red-900" onClick={() => handleCompletionStatus('not-explained')}>
+                            <X className="size-4 text-red-600" />
+                        </Button>
+                    </div>
+                )}
             </CardContent>
         </Card>
     )
@@ -336,6 +379,7 @@ export function ClassmatesDashboard({ classmates, explanations, currentUser, cla
     const pendingInvitations = (explanations || []).filter(exp => 
         (exp.contributors || []).some(c => c.userId === currentUser?.uid && c.status === 'pending')
     );
+    const isAdmin = currentUser?.role === 'admin';
 
     return (
         <Card>
@@ -350,7 +394,7 @@ export function ClassmatesDashboard({ classmates, explanations, currentUser, cla
                             </CardDescription>
                         </div>
                     </div>
-                    <DeleteAllDialog classroomId={classroomId} />
+                    {isAdmin && <DeleteAllDialog classroomId={classroomId} />}
                 </div>
                  {pendingInvitations.length > 0 && (
                     <div className="!mt-4 space-y-2">
@@ -380,7 +424,7 @@ export function ClassmatesDashboard({ classmates, explanations, currentUser, cla
                     ))
                 ) : classmates.length === 0 ? (
                      <div className="h-24 text-center flex items-center justify-center">
-                        You're the first one here! Invite your classmates.
+                        This class has no students yet.
                     </div>
                 ) : (
                     classmates.map(student => {

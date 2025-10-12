@@ -122,9 +122,21 @@
         "createdAt": {
           "type": "string",
           "format": "date-time"
+        },
+        "explanationDate": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "status": {
+          "type": "string",
+          "enum": ["Upcoming", "Finished"]
+        },
+        "completionStatus": {
+            "type": "string",
+            "enum": ["pending", "explained", "not-explained"]
         }
       },
-      "required": ["userId", "userName", "subject", "day", "session", "concepts"]
+      "required": ["userId", "userName", "subject", "day", "session", "concepts", "explanationDate", "status"]
     }
   },
   "auth": {

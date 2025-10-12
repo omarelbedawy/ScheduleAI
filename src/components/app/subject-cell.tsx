@@ -218,6 +218,7 @@ const ExplainDialog = ({ user, classroomId, day, session, subject, children, onO
         concepts,
         explanationDate,
         status: 'Upcoming' as const,
+        completionStatus: 'pending' as const,
         createdAt: serverTimestamp(),
         ...( !isLanguage && { learningOutcome: parseInt(learningOutcome, 10) })
       };
@@ -483,7 +484,7 @@ export function SubjectCell({ subject, isEditing, onChange, user, classroomId, d
     const canExplain = explainableSubjects.includes(subjectPart);
 
     // Find explanations for this specific subject part
-    const partExplanations = explanations.filter(e => e.subject === subjectPart);
+    const partExplanations = (explanations || []).filter(e => e.subject === subjectPart);
     const acceptedCount = partExplanations.reduce((acc, exp) => acc + (exp.contributors || []).filter(c => c.status === 'accepted').length, 0);
 
 
@@ -495,7 +496,7 @@ export function SubjectCell({ subject, isEditing, onChange, user, classroomId, d
           {
             "hover:!scale-110 hover:shadow-lg hover:z-10": isSubjectSplit && canExplain,
             "p-2": !isSubjectSplit,
-            "cursor-pointer": isEditing || canExplain,
+            "cursor-pointer": isEditing || (canExplain && user?.role === 'student'),
           }
         )}
       >
@@ -529,7 +530,7 @@ export function SubjectCell({ subject, isEditing, onChange, user, classroomId, d
       return cellWrapper; // Dropdown is handled by the parent
     }
 
-    if (canExplain && user && classroomId) {
+    if (canExplain && user?.role === 'student' && classroomId) {
       return (
         <ExplainDialog
           user={user}

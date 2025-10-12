@@ -1,0 +1,265 @@
+
+"use client";
+
+import { useMemo, useState, useEffect } from "react";
+import type { UserProfile, Explanation } from "@/lib/types";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
+import { Input } from "@/components/ui/input";
+import { ScheduleTable } from "./schedule-table";
+import { useFirestore, useCollection, useDoc, useMemoFirebase } from "@/firebase";
+import { doc, collection, query, where, deleteDoc } from "firebase/firestore";
+import { ClassmatesDashboard } from "./classmates-dashboard";
+import { Loader2, Trash2 } from "lucide-react";
+import { cn } from "@/lib/utils";
+import { schoolList } from "@/lib/schools";
+import { useToast } from "@/hooks/use-toast";
+
+interface ClassroomSchedule {
+  schedule: any[];
+  lastUpdatedBy?: string;
+  updatedAt?: any;
+}
+
+
+function UserManagement({ adminUser }: { adminUser: UserProfile }) {
+  const firestore = useFirestore();
+  const { toast } = useToast();
+  const usersQuery = useMemoFirebase(() => {
+    if (!firestore) return null;
+    return collection(firestore, 'users');
+  }, [firestore]);
+  const { data: users, loading: usersLoading } = useCollection<UserProfile>(usersQuery);
+  const [filter, setFilter] = useState("");
+
+  const handleDeleteUser = async (userId: string) => {
+    if (!firestore) return;
+    try {
+      // NOTE: This does not delete the user from Firebase Auth, only Firestore.
+      // A backend function would be required for full deletion.
+      await deleteDoc(doc(firestore, 'users', userId));
+      toast({ title: "User Deleted", description: "The user has been removed from Firestore."});
+    } catch (error) {
+        console.error("Error deleting user: ", error);
+        toast({ variant: "destructive", title: "Deletion Failed", description: "Could not delete user."});
+    }
+  }
+
+  const filteredUsers = useMemo(() => {
+    if (!users) return [];
+    return users.filter(u => u.uid !== adminUser.uid && (
+        u.name.toLowerCase().includes(filter.toLowerCase()) ||
+        u.email.toLowerCase().includes(filter.toLowerCase()) ||
+        u.role.toLowerCase().includes(filter.toLowerCase())
+    ));
+  }, [users, filter, adminUser.uid]);
+
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle>User Management</CardTitle>
+        <CardDescription>View, edit, and delete users from the system.</CardDescription>
+      </CardHeader>
+      <CardContent className="space-y-4">
+        <Input 
+            placeholder="Filter by name, email, or role..."
+            value={filter}
+            onChange={(e) => setFilter(e.target.value)}
+        />
+        <div className="border rounded-md">
+            <Table>
+            <TableHeader>
+                <TableRow>
+                <TableHead>Name</TableHead>
+                <TableHead>Email</TableHead>
+                <TableHead>Role</TableHead>
+                <TableHead>School</TableHead>
+                <TableHead className="text-right">Actions</TableHead>
+                </TableRow>
+            </TableHeader>
+            <TableBody>
+                {usersLoading ? (
+                    <TableRow><TableCell colSpan={5} className="text-center"><Loader2 className="inline-block animate-spin" /></TableCell></TableRow>
+                ) : filteredUsers.map(user => (
+                    <TableRow key={user.uid}>
+                        <TableCell className="font-medium">{user.name}</TableCell>
+                        <TableCell>{user.email}</TableCell>
+                        <TableCell><Badge variant={user.role === 'admin' ? 'destructive' : 'secondary'}>{user.role}</Badge></TableCell>
+                        <TableCell>{schoolList.find(s => s.id === user.school)?.name || user.school}</TableCell>
+                        <TableCell className="text-right">
+                           <AlertDialog>
+                                <AlertDialogTrigger asChild>
+                                    <Button variant="ghost" size="icon" className="text-destructive"><Trash2 className="size-4"/></Button>
+                                </AlertDialogTrigger>
+                                <AlertDialogContent>
+                                    <AlertDialogHeader><AlertDialogTitle>Delete {user.name}?</AlertDialogTitle><AlertDialogDescription>This action cannot be undone. This will permanently delete the user's profile from the database.</AlertDialogDescription></AlertDialogHeader>
+                                    <AlertDialogFooter><AlertDialogCancel>Cancel</AlertDialogCancel><AlertDialogAction onClick={() => handleDeleteUser(user.uid)} className="bg-destructive hover:bg-destructive/90">Delete User</AlertDialogAction></AlertDialogFooter>
+                                </AlertDialogContent>
+                            </AlertDialog>
+                        </TableCell>
+                    </TableRow>
+                ))}
+            </TableBody>
+            </Table>
+        </div>
+      </CardContent>
+    </Card>
+  );
+}
+
+export function AdminDashboard({ admin }: { admin: UserProfile }) {
+  const [selectedSchool, setSelectedSchool] = useState<string>(schoolList[0].id);
+  const [selectedGrade, setSelectedGrade] = useState<string>("11");
+  const [selectedClass, setSelectedClass] = useState<string>("c");
+  const [view, setView] = useState<'users' | 'classrooms'>('classrooms');
+
+  const firestore = useFirestore();
+
+  const classroomId = useMemo(() => {
+    if (!selectedSchool || !selectedGrade || !selectedClass) return null;
+    return `${selectedSchool}-${selectedGrade}-${selectedClass}`;
+  }, [selectedSchool, selectedGrade, selectedClass]);
+
+  const classroomDocRef = useMemoFirebase(() => {
+    if (!firestore || !classroomId) return null;
+    return doc(firestore, 'classrooms', classroomId);
+  }, [firestore, classroomId]);
+  const { data: classroomSchedule, loading: classroomLoading } = useDoc<ClassroomSchedule>(classroomDocRef);
+
+  const classmatesQuery = useMemoFirebase(() => {
+    if (!firestore || !selectedSchool || !selectedGrade || !selectedClass) return null;
+    return query(
+      collection(firestore, "users"),
+      where("school", "==", selectedSchool),
+      where("grade", "==", selectedGrade),
+      where("class", "==", selectedClass)
+    );
+  }, [firestore, selectedSchool, selectedGrade, selectedClass]);
+  const { data: classmates, loading: classmatesLoading } = useCollection<UserProfile>(classmatesQuery);
+
+  const explanationsQuery = useMemoFirebase(() => {
+    if (!firestore || !classroomId) return null;
+    return collection(firestore, 'classrooms', classroomId, 'explanations');
+  }, [firestore, classroomId]);
+  const { data: explanations, loading: explanationsLoading } = useCollection<Explanation>(explanationsQuery);
+
+  const isLoading = classroomLoading || classmatesLoading || explanationsLoading;
+  const schoolName = schoolList.find(s => s.id === selectedSchool)?.name || selectedSchool;
+
+  return (
+    <div className="space-y-8">
+        <Card>
+            <CardHeader>
+                <div className="flex justify-between items-center">
+                    <div>
+                        <CardTitle>Admin Dashboard</CardTitle>
+                        <CardDescription>Oversee all schools, classes, and users.</CardDescription>
+                    </div>
+                     <div className="flex gap-2">
+                        <Button variant={view === 'classrooms' ? 'default' : 'outline'} onClick={() => setView('classrooms')}>Classrooms</Button>
+                        <Button variant={view === 'users' ? 'default' : 'outline'} onClick={() => setView('users')}>Users</Button>
+                    </div>
+                </div>
+            </CardHeader>
+        </Card>
+
+      {view === 'classrooms' && (
+        <>
+            <Card>
+                <CardHeader>
+                    <CardTitle>Classroom Browser</CardTitle>
+                    <CardDescription>Select a school, grade, and class to view its details.</CardDescription>
+                </CardHeader>
+                <CardContent>
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    <Select value={selectedSchool} onValueChange={setSelectedSchool}>
+                    <SelectTrigger><SelectValue placeholder="Select School" /></SelectTrigger>
+                    <SelectContent>{schoolList.map(s => <SelectItem key={s.id} value={s.id}>{s.name}</SelectItem>)}</SelectContent>
+                    </Select>
+                    <Select value={selectedGrade} onValueChange={setSelectedGrade}>
+                    <SelectTrigger><SelectValue placeholder="Select Grade" /></SelectTrigger>
+                    <SelectContent>
+                        <SelectItem value="10">Grade 10</SelectItem>
+                        <SelectItem value="11">Grade 11</SelectItem>
+                        <SelectItem value="12">Grade 12</SelectItem>
+                    </SelectContent>
+                    </Select>
+                    <Select value={selectedClass} onValueChange={setSelectedClass}>
+                    <SelectTrigger><SelectValue placeholder="Select Class" /></SelectTrigger>
+                    <SelectContent>{['a','b','c','d','e','f'].map(c => <SelectItem key={c} value={c}>Class {c.toUpperCase()}</SelectItem>)}</SelectContent>
+                    </Select>
+                </div>
+                </CardContent>
+            </Card>
+
+            <Card>
+                <CardHeader>
+                    <CardTitle>Schedule for Class {selectedGrade}{selectedClass.toUpperCase()} at {schoolName}</CardTitle>
+                    <CardDescription>Viewing as an administrator.</CardDescription>
+                </CardHeader>
+                <CardContent>
+                    {isLoading ? (
+                        <div className="flex justify-center items-center h-48"><Loader2 className="h-8 w-8 animate-spin text-primary" /></div>
+                    ) : (classroomSchedule?.schedule && classroomSchedule.schedule.length > 0) ? (
+                        <ScheduleTable
+                            scheduleData={classroomSchedule.schedule}
+                            isEditing={false} // Admins probably shouldn't edit schedules directly
+                            user={admin}
+                            classroomId={classroomId}
+                            explanations={explanations || []}
+                            classmates={classmates}
+                        />
+                    ) : (
+                        <div className="text-center text-muted-foreground py-10">The schedule for this class has not been uploaded yet.</div>
+                    )}
+                </CardContent>
+            </Card>
+
+            {classroomId && !isLoading && (
+                <ClassmatesDashboard 
+                    classmates={classmates} 
+                    explanations={explanations} 
+                    currentUser={admin}
+                    classroomId={classroomId}
+                />
+            )}
+        </>
+      )}
+       {view === 'users' && (
+           <UserManagement adminUser={admin} />
+       )}
+    </div>
+  );
+}
