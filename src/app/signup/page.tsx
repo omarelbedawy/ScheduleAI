@@ -98,7 +98,6 @@ export default function SignUpPage() {
       router.push("/");
 
     } catch (error: any) {
-      // Don't log the auth error with console.error, toast is enough
       toast({
         variant: "destructive",
         title: "Sign Up Failed",
@@ -204,10 +203,7 @@ export default function SignUpPage() {
                         <FormControl>
                           <SelectTrigger>
                             <SelectValue placeholder="Class" />
-                          </SelectTrigger> 
-                          {/* This is the line that caused the error. 
-                            It was </Trigger> but should be </SelectTrigger> 
-                          */}
+                          </SelectTrigger>
                         </FormControl>
                         <SelectContent>
                           {['a', 'b', 'c', 'd', 'e', 'f'].map(c => (
