@@ -613,5 +613,3 @@ function UploadCard({
     </Card>
   );
 }
-
-    

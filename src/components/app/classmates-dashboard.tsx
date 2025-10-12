@@ -20,7 +20,7 @@ import {
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
 import { useFirestore } from "@/firebase";
-import { doc, deleteDoc, updateDoc } from "firebase/firestore";
+import { doc, deleteDoc, updateDoc, writeBatch, collection, getDocs, query } from "firebase/firestore";
 import { useToast } from "@/hooks/use-toast";
 import { format, formatDistanceToNow } from 'date-fns';
 import { cn } from "@/lib/utils";
@@ -30,6 +30,9 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from "@/components/ui/tooltip"
+import { useState } from "react";
+import { Input } from "../ui/input";
+import { Label } from "../ui/label";
 
 
 function getInitials(name: string) {
@@ -228,6 +231,101 @@ function ExplanationCard({
     )
 }
 
+function DeleteAllDialog({ classroomId }: { classroomId: string | null }) {
+    const firestore = useFirestore();
+    const { toast } = useToast();
+    const [password, setPassword] = useState("");
+    const [isOpen, setIsOpen] = useState(false);
+    const correctPassword = "OmarElbedawyistheonlyadmin";
+
+    const handleDeleteAll = async () => {
+        if (password !== correctPassword) {
+            toast({
+                variant: "destructive",
+                title: "Incorrect Password",
+                description: "You are not authorized to perform this action.",
+            });
+            return;
+        }
+
+        if (!firestore || !classroomId) {
+            toast({
+                variant: "destructive",
+                title: "Error",
+                description: "Could not connect to the database.",
+            });
+            return;
+        }
+
+        try {
+            const explanationsRef = collection(firestore, "classrooms", classroomId, "explanations");
+            const q = query(explanationsRef);
+            const querySnapshot = await getDocs(q);
+            
+            if (querySnapshot.empty) {
+                 toast({
+                    title: "Nothing to Delete",
+                    description: "There are no explanation commitments to delete.",
+                });
+                setIsOpen(false);
+                return;
+            }
+
+            const batch = writeBatch(firestore);
+            querySnapshot.forEach((doc) => {
+                batch.delete(doc.ref);
+            });
+            await batch.commit();
+
+            toast({
+                title: "Success!",
+                description: "All explanation commitments have been deleted.",
+            });
+            setPassword("");
+            setIsOpen(false);
+        } catch (error) {
+            console.error("Error deleting all explanations: ", error);
+            toast({
+                variant: "destructive",
+                title: "Deletion Failed",
+                description: "There was a problem deleting the commitments. Please try again.",
+            });
+        }
+    };
+
+    return (
+        <AlertDialog open={isOpen} onOpenChange={setIsOpen}>
+            <AlertDialogTrigger asChild>
+                <Button variant="destructive" className="font-bold">Delete all sessions</Button>
+            </AlertDialogTrigger>
+            <AlertDialogContent>
+                <AlertDialogHeader>
+                    <AlertDialogTitle>Are you the admin?</AlertDialogTitle>
+                    <AlertDialogDescription>
+                        This is a destructive action and will permanently delete all student commitments for this classroom. To proceed, please enter the admin password.
+                    </AlertDialogDescription>
+                </AlertDialogHeader>
+                <div className="space-y-2">
+                    <Label htmlFor="admin-password">Admin Password</Label>
+                    <Input
+                        id="admin-password"
+                        type="password"
+                        value={password}
+                        onChange={(e) => setPassword(e.target.value)}
+                        placeholder="Enter the secret password"
+                    />
+                </div>
+                <AlertDialogFooter>
+                    <AlertDialogCancel onClick={() => setPassword("")}>Cancel</AlertDialogCancel>
+                    <AlertDialogAction onClick={handleDeleteAll} disabled={password !== correctPassword}>
+                        Confirm Deletion
+                    </AlertDialogAction>
+                </AlertDialogFooter>
+            </AlertDialogContent>
+        </AlertDialog>
+    );
+}
+
 export function ClassmatesDashboard({ classmates, explanations, currentUser, classroomId }: { 
     classmates: UserProfile[] | null;
     explanations: Explanation[] | null;
@@ -242,14 +340,17 @@ export function ClassmatesDashboard({ classmates, explanations, currentUser, cla
     return (
         <Card>
             <CardHeader>
-                <div className="flex items-center gap-3">
-                    <Users className="size-6 text-primary"/>
-                    <div>
-                        <CardTitle>Classmates & Commitments</CardTitle>
-                        <CardDescription>
-                            Students in your class and their commitments to explain topics.
-                        </CardDescription>
+                <div className="flex items-start justify-between gap-4">
+                    <div className="flex items-center gap-3">
+                        <Users className="size-6 text-primary"/>
+                        <div>
+                            <CardTitle>Classmates & Commitments</CardTitle>
+                            <CardDescription>
+                                Students in your class and their commitments to explain topics.
+                            </CardDescription>
+                        </div>
                     </div>
+                    <DeleteAllDialog classroomId={classroomId} />
                 </div>
                  {pendingInvitations.length > 0 && (
                     <div className="!mt-4 space-y-2">
