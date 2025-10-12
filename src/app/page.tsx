@@ -9,6 +9,7 @@ import { useEffect } from "react";
 import { Loader2 } from "lucide-react";
 import { useFirestore, useDoc, useMemoFirebase } from "@/firebase";
 import type { UserProfile } from "@/lib/types";
+import { doc } from "firebase/firestore";
 
 export default function Home() {
   const { user, loading: userLoading } = useUser();
