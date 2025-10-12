@@ -41,8 +41,8 @@ function getInitials(name: string) {
 
 
 function ContributorList({ contributors }: { contributors: ExplanationContributor[] }) {
-    const visibleContributors = contributors.filter(c => c.status === 'accepted' || c.status === 'pending');
-    const acceptedCount = contributors.filter(c => c.status === 'accepted').length;
+    const visibleContributors = (contributors || []).filter(c => c.status === 'accepted' || c.status === 'pending');
+    const acceptedCount = (contributors || []).filter(c => c.status === 'accepted').length;
 
     if (visibleContributors.length === 0) return null;
 
@@ -82,7 +82,7 @@ function InvitationManager({
 }) {
     const firestore = useFirestore();
     const { toast } = useToast();
-    const userInvite = explanation.contributors.find(c => c.userId === currentUser?.uid && c.status === 'pending');
+    const userInvite = (explanation.contributors || []).find(c => c.userId === currentUser?.uid && c.status === 'pending');
 
     if (!userInvite) return null;
 
@@ -90,7 +90,7 @@ function InvitationManager({
         if (!firestore || !classroomId) return;
         const explanationRef = doc(firestore, 'classrooms', classroomId, 'explanations', explanation.id);
 
-        const newContributors = explanation.contributors.map(c => 
+        const newContributors = (explanation.contributors || []).map(c => 
             c.userId === currentUser?.uid ? { ...c, status: accept ? 'accepted' : 'declined' } : c
         );
 
@@ -239,8 +239,8 @@ export function ClassmatesDashboard({ classmates, explanations, currentUser, cla
     classroomId: string | null;
 }) {
 
-    const userExplanations = explanations?.filter(exp => exp.contributors.some(c => c.userId === currentUser?.uid)) || [];
-    const pendingInvitations = userExplanations.filter(exp => exp.contributors.some(c => c.userId === currentUser?.uid && c.status === 'pending'));
+    const userExplanations = explanations?.filter(exp => (exp.contributors || []).some(c => c.userId === currentUser?.uid)) || [];
+    const pendingInvitations = userExplanations.filter(exp => (exp.contributors || []).some(c => c.userId === currentUser?.uid && c.status === 'pending'));
 
     return (
         <Card>
@@ -286,7 +286,7 @@ export function ClassmatesDashboard({ classmates, explanations, currentUser, cla
                 ) : (
                     classmates.map(student => {
                         const studentExplanations = explanations
-                            ?.filter(exp => exp.contributors.some(c => c.userId === student.uid && c.status === 'accepted'))
+                            ?.filter(exp => (exp.contributors || []).some(c => c.userId === student.uid && c.status === 'accepted'))
                             .sort((a, b) => b.createdAt.toDate() - a.createdAt.toDate()) || [];
 
                         return (
@@ -320,3 +320,5 @@ export function ClassmatesDashboard({ classmates, explanations, currentUser, cla
         </Card>
     );
 }
+
+    
