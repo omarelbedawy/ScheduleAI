@@ -1,77 +1,76 @@
 /**
- * @file Firestore Security Rules
- * @core-philosophy This ruleset enforces a strict user-ownership model for user profiles
- *  and allows public read access to classroom schedules. Only authenticated users can
- *  create their own profiles.
- * @data-structure
- *  - /users/{userId}: Stores public profile information for each user. The `userId` in the path
- *    must match the authenticated user's UID.
- *  - /classrooms/{classroomId}: Stores the shared schedule for a classroom. The `classroomId`
- *    is a combination of grade and class (e.g., '11-c'). This data is publicly readable.
- * @key-security-decisions
- *  - Users can only create, read, update, and delete their own profile data.
- *  - Classroom schedules are publicly readable but not writable through the client.
+ * @fileoverview Firestore Security Rules for Prototyping.
+ *
+ * Core Philosophy:
+ * This ruleset enforces a strict user-ownership model for user profiles
+ * and allows public read access to classroom schedules.
+ *
+ * Data Structure:
+ * - User profiles are stored under `/users/{userId}`.
+ * - Classroom schedules are stored under `/classrooms/{classroomId}`.
+ *
+ * Key Security Decisions:
+ * - Users can only read/write their own profile data.
+ * - Classroom schedules are publicly readable but not writable via the client.
+ *   Write operations to `/classrooms/{classroomId}` are denied. Backend triggers or
+ *   Cloud Functions should be used to manage classroom schedule data.
+ * - Listing of users is disallowed for privacy.
+ *
+ * Denormalization for Authorization:
+ *  -  N/A - Simple ownership model for user profiles based on `userId` in the path.
+ *
+ * Structural Segregation:
+ *  -  Separate collections are used for user profiles (private) and classroom
+ *     schedules (public read-only).
  */
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
 
     /**
-     * @description Manages user profile access. Only the user themselves can create, read, update, or delete their profile.
+     * @description Controls access to user profile documents.
      * @path /users/{userId}
-     * @allow (create) - Authenticated user 'user_abc' can create their profile at /users/user_abc.
-     * @allow (get) - Authenticated user 'user_abc' can read their profile at /users/user_abc.
-     * @allow (update) - Authenticated user 'user_abc' can update their profile at /users/user_abc.
-     * @allow (delete) - Authenticated user 'user_abc' can delete their profile at /users/user_abc.
-     * @deny (create) - Authenticated user 'user_xyz' cannot create a profile at /users/user_abc.
-     * @deny (get) - Authenticated user 'user_xyz' cannot read the profile at /users/user_abc.
-     * @deny (update) - Authenticated user 'user_xyz' cannot update the profile at /users/user_abc.
-     * @deny (delete) - Authenticated user 'user_xyz' cannot delete the profile at /users/user_abc.
-     * @principle Enforces document ownership for writes and restricts access to a user's own data tree.
+     * @allow (get) Authenticated user can read their own profile.
+     * @allow (create) Authenticated user can create their own profile.
+     * @allow (update) Authenticated user can update their own profile.
+     * @allow (delete) Authenticated user can delete their own profile.
+     * @deny (get) Authenticated user cannot read another user's profile.
+     * @deny (create) Authenticated user cannot create another user's profile if the ID doesn't match.
+     * @deny (update) Authenticated user cannot update another user's profile.
+     * @deny (delete) Authenticated user cannot delete another user's profile.
+     * @principle Enforces document ownership for all operations.
      */
     match /users/{userId} {
-      // Helper function to check if the request is made by the owner of the user document.
+      // Helper function to check if the request is made by the owner of the user profile.
       function isOwner(userId) {
         return request.auth != null && request.auth.uid == userId;
       }
 
-      // Helper function to check if the request is made by the existing owner of the user document, implying the document exists.
+      // Helper function to check if the request is made by the existing owner of the user profile.
       function isExistingOwner(userId) {
         return isOwner(userId) && resource != null;
       }
 
-      // Allows a user to create their own profile if the userId matches their authentication UID.
-      allow create: if isOwner(userId);
-
-      // Allows a user to get their own profile.
       allow get: if isOwner(userId);
-
-      // Allows a user to list all users - this is generally discouraged for privacy reasons.
       allow list: if false;
 
-      // Allows a user to update their own profile if the userId matches their authentication UID and the document exists.
+      allow create: if isOwner(userId) && request.resource.data.email is string;
       allow update: if isExistingOwner(userId);
-
-      // Allows a user to delete their own profile if the userId matches their authentication UID and the document exists.
       allow delete: if isExistingOwner(userId);
     }
 
     /**
-     * @description Manages access to classroom schedules.  Classroom schedules are publicly readable.
-     *  Writes are not permitted through the client.
+     * @description Controls access to classroom schedule documents.
      * @path /classrooms/{classroomId}
-     * @allow (get) - Any user can read a classroom schedule.
-     * @allow (list) - Any user can list classroom schedules.
-     * @deny (create) - No one can create a classroom schedule document via client.
-     * @deny (update) - No one can update a classroom schedule document via client.
-     * @deny (delete) - No one can delete a classroom schedule document via client.
-     * @principle Allows public read access to classroom schedules but restricts writes.
+     * @allow (get) Any user can read classroom schedule.
+     * @allow (list) Any user can list classroom schedules.
+     * @deny (create) No user can create classroom schedule via client (use backend).
+     * @deny (update) No user can update classroom schedule via client (use backend).
+     * @deny (delete) No user can delete classroom schedule via client (use backend).
+     * @principle Allows public read access but restricts write access.
      */
     match /classrooms/{classroomId} {
-      // Allows anyone to read classroom schedules.
       allow get, list: if true;
-
-      // Disallows anyone from creating, updating, or deleting classroom schedules.
       allow create, update, delete: if false;
     }
   }
