@@ -40,7 +40,7 @@ export function ClassmatesDashboard({ classmates }: { classmates: UserProfile[] 
                     <TableBody>
                         {!classmates ? (
                              Array.from({ length: 3 }).map((_, i) => (
-                                <TableRow key={i}>
+                                <TableRow key={`skeleton-row-${i}`}>
                                     <TableCell>
                                         <Skeleton className="h-10 w-10 rounded-full" />
                                     </TableCell>
