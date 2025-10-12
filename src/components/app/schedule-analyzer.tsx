@@ -78,18 +78,15 @@ export function ScheduleAnalyzer() {
   useEffect(() => {
     const isComponentLoading = userLoading || userProfileLoading || classroomLoading;
     
-    // Only show initializing screen on initial load
-    if (isComponentLoading && state === 'initializing') {
+    if (state === 'initializing' && isComponentLoading) {
       return;
     }
-    
-    // Once everything is loaded...
-    if (!isComponentLoading) {
-      if (classroomSchedule && classroomSchedule.schedule && classroomSchedule.schedule.length > 0) {
+
+    if (state === 'initializing' && !isComponentLoading) {
+      if (classroomSchedule?.schedule && classroomSchedule.schedule.length > 0) {
         setEditableSchedule(JSON.parse(JSON.stringify(classroomSchedule.schedule)));
         setState("displaying");
       } else {
-        // If there's no schedule, go to idle to allow upload.
         setState("idle");
       }
     }
@@ -263,81 +260,20 @@ export function ScheduleAnalyzer() {
     );
   }
 
-  // This is the "empty" state, where no schedule exists for the class.
-  // It handles both the initial idle state and the previewing state.
-  if (state === "idle" || state === "previewing") {
-    return (
-      <Card
-        className={cn(
-          "border-2 border-dashed transition-colors",
-          isDragging && "border-primary bg-primary/10"
-        )}
-        onDragOver={onDragOver}
-        onDragLeave={onDragLeave}
-        onDrop={onDrop}
-      >
-        <CardHeader>
-          <CardTitle>No Schedule Found</CardTitle>
-          <CardDescription>Your class doesn't have a schedule yet. Upload one to get started!</CardDescription>
-        </CardHeader>
-        <CardContent className="p-6">
-          <input
-            type="file"
-            ref={fileInputRef}
-            onChange={onFileChange}
-            className="hidden"
-            accept="image/*"
-          />
-          {state === "idle" && (
-            <div className="flex flex-col items-center justify-center space-y-4 py-16 text-center">
-              <div className="rounded-full border border-dashed bg-secondary p-4">
-                <UploadCloud className="size-10 text-muted-foreground" />
-              </div>
-              <p className="text-muted-foreground">
-                Drag & drop your schedule image here, or
-              </p>
-              <Button
-                onClick={() => fileInputRef.current?.click()}
-                className="bg-accent text-accent-foreground hover:bg-accent/90"
-              >
-                Browse Files
-              </Button>
-            </div>
-          )}
-          {state === "previewing" && previewUrl && (
-            <div className="flex flex-col items-center gap-6">
-              <div className="relative w-full max-w-md rounded-lg border p-2 shadow-sm">
-                <Image
-                  src={previewUrl}
-                  alt="Schedule preview"
-                  width={600}
-                  height={400}
-                  className="max-h-80 w-full rounded-md object-contain"
-                />
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  className="absolute right-3 top-3 h-8 w-8 rounded-full bg-background/70 hover:bg-background"
-                  onClick={onReset}
-                >
-                  <X className="size-4" />
-                </Button>
-              </div>
-              <Button
-                onClick={onSubmit}
-                className="w-full max-w-md bg-accent text-accent-foreground hover:bg-accent/90"
-              >
-                Analyze Schedule
-              </Button>
-            </div>
-          )}
-        </CardContent>
-      </Card>
-    );
-  }
-
-  // Fallback for any other state, essentially a loading state
-  return <LoadingState isAnalyzing={false} />;
+  return (
+    <UploadCard
+      isDragging={isDragging}
+      onDragOver={onDragOver}
+      onDragLeave={onDragLeave}
+      onDrop={onDrop}
+      fileInputRef={fileInputRef}
+      onFileChange={onFileChange}
+      state={state}
+      previewUrl={previewUrl}
+      onReset={onReset}
+      onSubmit={onSubmit}
+    />
+  );
 }
 
 function LoadingState({ isAnalyzing }: { isAnalyzing: boolean }) {
@@ -452,3 +388,97 @@ function ResultState({ classroomSchedule, editableSchedule, onCopy, isCopied, on
     </Card>
   );
 }
+
+function UploadCard({
+  isDragging,
+  onDragOver,
+  onDragLeave,
+  onDrop,
+  fileInputRef,
+  onFileChange,
+  state,
+  previewUrl,
+  onReset,
+  onSubmit,
+}: {
+  isDragging: boolean;
+  onDragOver: (e: DragEvent<HTMLDivElement>) => void;
+  onDragLeave: (e: DragEvent<HTMLDivElement>) => void;
+  onDrop: (e: DragEvent<HTMLDivElement>) => void;
+  fileInputRef: React.RefObject<HTMLInputElement>;
+  onFileChange: (e: ChangeEvent<HTMLInputElement>) => void;
+  state: AnalysisState;
+  previewUrl: string | null;
+  onReset: () => void;
+  onSubmit: () => void;
+}) {
+  return (
+    <Card
+      className={cn(
+        "border-2 border-dashed transition-colors",
+        isDragging && "border-primary bg-primary/10"
+      )}
+      onDragOver={onDragOver}
+      onDragLeave={onDragLeave}
+      onDrop={onDrop}
+    >
+      <CardHeader>
+        <CardTitle>No Schedule Found</CardTitle>
+        <CardDescription>Your class doesn't have a schedule yet. Upload one to get started!</CardDescription>
+      </CardHeader>
+      <CardContent className="p-6">
+        <input
+          type="file"
+          ref={fileInputRef}
+          onChange={onFileChange}
+          className="hidden"
+          accept="image/*"
+        />
+        {state === "idle" && (
+          <div className="flex flex-col items-center justify-center space-y-4 py-16 text-center">
+            <div className="rounded-full border border-dashed bg-secondary p-4">
+              <UploadCloud className="size-10 text-muted-foreground" />
+            </div>
+            <p className="text-muted-foreground">
+              Drag & drop your schedule image here, or
+            </p>
+            <Button
+              onClick={() => fileInputRef.current?.click()}
+              className="bg-accent text-accent-foreground hover:bg-accent/90"
+            >
+              Browse Files
+            </Button>
+          </div>
+        )}
+        {state === "previewing" && previewUrl && (
+          <div className="flex flex-col items-center gap-6">
+            <div className="relative w-full max-w-md rounded-lg border p-2 shadow-sm">
+              <Image
+                src={previewUrl}
+                alt="Schedule preview"
+                width={600}
+                height={400}
+                className="max-h-80 w-full rounded-md object-contain"
+              />
+              <Button
+                variant="ghost"
+                size="icon"
+                className="absolute right-3 top-3 h-8 w-8 rounded-full bg-background/70 hover:bg-background"
+                onClick={onReset}
+              >
+                <X className="size-4" />
+              </Button>
+            </div>
+            <Button
+              onClick={onSubmit}
+              className="w-full max-w-md bg-accent text-accent-foreground hover:bg-accent/90"
+            >
+              Analyze Schedule
+            </Button>
+          </div>
+        )}
+      </CardContent>
+    </Card>
+  );
+}
+
