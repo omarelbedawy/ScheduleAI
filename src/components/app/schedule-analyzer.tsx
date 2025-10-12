@@ -4,10 +4,8 @@
 import type { AnalyzeScheduleFromImageOutput } from "@/ai/flows/analyze-schedule-from-image";
 import { ChangeEvent, DragEvent, useEffect, useRef, useState } from "react";
 import {
-  AlertTriangle,
   Check,
   Copy,
-  FileImage,
   Loader2,
   Pencil,
   Save,
@@ -16,11 +14,6 @@ import {
 } from "lucide-react";
 
 import { analyzeScheduleAction } from "@/app/actions";
-import {
-  Alert,
-  AlertDescription,
-  AlertTitle,
-} from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import {
   Card,
@@ -42,7 +35,7 @@ import type { UserProfile } from "@/lib/types";
 import { errorEmitter } from "@/firebase/error-emitter";
 import { FirestorePermissionError, type SecurityRuleContext } from "@/firebase/errors";
 
-type AnalysisState = "idle" | "previewing" | "loading" | "displaying";
+type AnalysisState = "idle" | "previewing" | "loading" | "displaying" | "initializing";
 type ScheduleRow = AnalyzeScheduleFromImageOutput["schedule"][number];
 
 interface ClassroomSchedule {
@@ -53,9 +46,9 @@ interface ClassroomSchedule {
 
 
 export function ScheduleAnalyzer() {
-  const { user } = useUser();
+  const { user, loading: userLoading } = useUser();
   const firestore = useFirestore();
-  const [state, setState] = useState<AnalysisState>("idle");
+  const [state, setState] = useState<AnalysisState>("initializing");
   const [isDragging, setIsDragging] = useState(false);
   const [file, setFile] = useState<File | null>(null);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
@@ -75,15 +68,20 @@ export function ScheduleAnalyzer() {
   const isLoading = userProfileLoading || classroomLoading;
 
   useEffect(() => {
-    if (isLoading) return;
+    // We must wait for all data loading to finish before deciding the state.
+    if (userLoading || userProfileLoading || classroomLoading) {
+      setState("initializing");
+      return;
+    }
     
-    if (classroomSchedule?.schedule) {
+    if (classroomSchedule && classroomSchedule.schedule && classroomSchedule.schedule.length > 0) {
       setEditableSchedule(JSON.parse(JSON.stringify(classroomSchedule.schedule)));
       setState("displaying");
     } else {
+      // If there's no schedule, the user should be prompted to upload one.
       setState("idle");
     }
-  }, [classroomSchedule, isLoading]);
+  }, [classroomSchedule, userLoading, userProfileLoading, classroomLoading]);
 
 
   const handleFileSelect = (selectedFile: File | null) => {
@@ -125,9 +123,14 @@ export function ScheduleAnalyzer() {
     if (previewUrl) URL.revokeObjectURL(previewUrl);
     setFile(null);
     setPreviewUrl(null);
-    setEditableSchedule(classroomSchedule?.schedule || []);
+    // Determine the correct "reset" state. If there was a schedule, go back to displaying it.
+    if (classroomSchedule?.schedule && classroomSchedule.schedule.length > 0) {
+        setEditableSchedule(JSON.parse(JSON.stringify(classroomSchedule.schedule)));
+        setState("displaying");
+    } else {
+        setState("idle");
+    }
     setIsEditing(false);
-    setState(classroomSchedule?.schedule ? "displaying" : "idle");
   };
 
   const toBase64 = (file: File): Promise<string> =>
@@ -229,8 +232,8 @@ export function ScheduleAnalyzer() {
     setTimeout(() => setIsCopied(false), 2000);
   };
 
-  if (state === "loading" || isLoading) {
-    return <LoadingState />;
+  if (state === "loading" || state === "initializing") {
+    return <LoadingState isAnalyzing={state === "loading"} />;
   }
 
   if (state === "displaying" && editableSchedule.length > 0) {
@@ -319,11 +322,15 @@ export function ScheduleAnalyzer() {
   );
 }
 
-function LoadingState() {
+function LoadingState({ isAnalyzing }: { isAnalyzing: boolean }) {
   const [progress, setProgress] = useState(0);
-  const [message, setMessage] = useState("Analyzing your schedule...");
+  const [message, setMessage] = useState(
+    isAnalyzing ? "Analyzing your schedule..." : "Loading schedule..."
+  );
 
   useEffect(() => {
+    if (!isAnalyzing) return;
+
     const messages = [
       "Extracting text from image...",
       "Identifying subjects and times...",
@@ -346,20 +353,22 @@ function LoadingState() {
     }, 800);
 
     return () => clearInterval(interval);
-  }, []);
+  }, [isAnalyzing]);
 
   return (
     <Card>
       <CardHeader>
-        <CardTitle>Loading Schedule...</CardTitle>
+        <CardTitle>{isAnalyzing ? "Analyzing..." : "Loading Schedule..."}</CardTitle>
         <CardDescription>
-          Please wait while we fetch the latest schedule for your class.
+          {isAnalyzing
+            ? "Please wait while the AI processes your schedule image."
+            : "Please wait while we fetch the latest schedule for your class."}
         </CardDescription>
       </CardHeader>
       <CardContent className="flex flex-col items-center justify-center space-y-4 py-16 text-center">
         <Loader2 className="size-12 animate-spin text-primary" />
         <p className="text-muted-foreground">{message}</p>
-        <Progress value={progress} className="w-full max-w-sm" />
+        {isAnalyzing && <Progress value={progress} className="w-full max-w-sm" />}
       </CardContent>
     </Card>
   );
@@ -419,11 +428,9 @@ function ResultState({ classroomSchedule, editableSchedule, onCopy, isCopied, on
       </CardContent>
       <CardFooter>
         <Button onClick={onReset} variant="outline">
-          Analyze Another
+          Upload New Schedule
         </Button>
       </CardFooter>
     </Card>
   );
 }
-
-    
