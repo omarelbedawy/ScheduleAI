@@ -7,17 +7,16 @@
  */
 
 import { ai } from '@/ai/genkit';
-import { z } from 'genkit';
+import { z } from 'zod';
 import { getAuth } from 'firebase-admin/auth';
-import { initializeApp, getApps, cert } from 'firebase-admin/app';
+import { initializeApp, getApps } from 'firebase-admin/app';
+import { firebaseConfig } from '@/firebase/config';
 
-const serviceAccount = JSON.parse(
-  process.env.GOOGLE_APPLICATION_CREDENTIALS || '{}'
-);
-
+// Initialize Firebase Admin SDK if it hasn't been already.
+// This runs in a secure server environment.
 if (getApps().length === 0) {
   initializeApp({
-    credential: cert(serviceAccount),
+    projectId: firebaseConfig.projectId,
   });
 }
 
