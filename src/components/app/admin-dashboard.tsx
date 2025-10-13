@@ -1,6 +1,7 @@
+
 "use client";
 
-import { useMemo, useState } from "react";
+import { useMemo, useState, useEffect } from "react";
 import type { UserProfile, Explanation } from "@/lib/types";
 import {
   Card,
@@ -67,11 +68,11 @@ function UserManagement({ adminUser }: { adminUser: UserProfile }) {
   const [users, setUsers] = useState<UserProfile[]>([]);
   const [filter, setFilter] = useState("");
 
-  useState(() => {
+  useEffect(() => {
     if (initialUsers) {
       setUsers(initialUsers);
     }
-  });
+  }, [initialUsers]);
 
 
   const handleDeleteUser = async (userId: string) => {
@@ -85,9 +86,6 @@ function UserManagement({ adminUser }: { adminUser: UserProfile }) {
 
     try {
       // First, delete the user from Firestore
-      await deleteDoc(doc(firestore, 'users', userId));
-      
-      // Then, call the secure server action to delete from Auth
       const result = await deleteUserAction({ userId });
 
       if (result.success) {
@@ -154,7 +152,7 @@ function UserManagement({ adminUser }: { adminUser: UserProfile }) {
                                     <Button variant="ghost" size="icon" className="text-destructive"><Trash2 className="size-4"/></Button>
                                 </AlertDialogTrigger>
                                 <AlertDialogContent>
-                                    <AlertDialogHeader><AlertDialogTitle>Delete {user.name}?</AlertDialogTitle><AlertDialogDescription>This action is irreversible and will permanently delete the user's account and all associated data.</AlertDialogDescription></AlertDialogHeader>
+                                    <AlertDialogHeader><AlertDialogTitle>Delete {user.name}?</AlertDialogTitle><AlertDialogDescription>This action is irreversible and will permanently delete the user's account and all associated data from both the database and authentication service.</AlertDialogDescription></AlertDialogHeader>
                                     <AlertDialogFooter><AlertDialogCancel>Cancel</AlertDialogCancel><AlertDialogAction onClick={() => handleDeleteUser(user.uid)} className="bg-destructive hover:bg-destructive/90">Delete User</AlertDialogAction></AlertDialogFooter>
                                 </AlertDialogContent>
                             </AlertDialog>
