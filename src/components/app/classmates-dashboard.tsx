@@ -135,8 +135,8 @@ function ExplanationCard({
     const firestore = useFirestore();
     const { toast } = useToast();
 
-    const isOwner = currentUser?.uid === explanation.ownerId;
     const isTeacher = currentUser?.role === 'teacher';
+    const isAdmin = currentUser?.role === 'admin';
     const isReviewed = explanation.completionStatus === 'explained' || explanation.completionStatus === 'not-explained';
 
     const createdAtDate = explanation.createdAt?.toDate();
@@ -177,15 +177,15 @@ function ExplanationCard({
         try {
             await deleteDoc(explanationRef);
             toast({
-                title: "Commitment Canceled",
-                description: "Your commitment to explain this topic has been removed.",
+                title: "Commitment Deleted",
+                description: "The commitment to explain this topic has been removed.",
             });
         } catch (error) {
             console.error("Error deleting explanation: ", error);
             toast({
                 variant: "destructive",
                 title: "Deletion Failed",
-                description: "There was a problem canceling your commitment. Please try again.",
+                description: "There was a problem deleting this commitment. Please try again.",
             });
         }
     }
@@ -218,7 +218,7 @@ function ExplanationCard({
                     : <Badge variant="outline"><Clock className="mr-1 h-3 w-3"/> Finished</Badge>
                 }
                 
-                {isOwner && explanation.status === 'Upcoming' && (
+                {isAdmin && (
                     <AlertDialog>
                         <AlertDialogTrigger asChild>
                             <Button variant="ghost" size="icon" className="h-7 w-7 text-muted-foreground hover:text-destructive opacity-0 group-hover:opacity-100 transition-opacity">
@@ -229,13 +229,13 @@ function ExplanationCard({
                             <AlertDialogHeader>
                             <AlertDialogTitle>Are you absolutely sure?</AlertDialogTitle>
                             <AlertDialogDescription>
-                                This action will permanently cancel your commitment to explain this topic. This cannot be undone.
+                                This action will permanently delete this explanation commitment. This cannot be undone.
                             </AlertDialogDescription>
                             </AlertDialogHeader>
                             <AlertDialogFooter>
                             <AlertDialogCancel>Keep Commitment</AlertDialogCancel>
                             <AlertDialogAction onClick={handleDelete} className="bg-destructive hover:bg-destructive/90">
-                                Yes, Cancel It
+                                Yes, Delete It
                             </AlertDialogAction>
                             </AlertDialogFooter>
                         </AlertDialogContent>
@@ -347,7 +347,7 @@ function DeleteAllDialog({ classroomId }: { classroomId: string | null }) {
     return (
         <AlertDialog open={isOpen} onOpenChange={setIsOpen}>
             <AlertDialogTrigger asChild>
-                <Button variant="destructive" className="font-bold">Delete all sessions</Button>
+                <Button variant="destructive" size="sm" className="font-bold"><Trash2 className="mr-2"/>Delete all sessions</Button>
             </AlertDialogTrigger>
             <AlertDialogContent>
                 <AlertDialogHeader>
@@ -475,7 +475,3 @@ export function ClassmatesDashboard({ classmates, explanations, currentUser, cla
         </Card>
     );
 }
-
-    
-
-    

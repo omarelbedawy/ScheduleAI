@@ -66,15 +66,17 @@ function UserManagement({ adminUser }: { adminUser: UserProfile }) {
   const [filter, setFilter] = useState("");
 
   const handleDeleteUser = async (userId: string) => {
+    // This is a placeholder for a cloud function that would delete the user from Auth
+    console.log(`Requesting deletion for user: ${userId}`);
+    // In a real app, you would call a cloud function here.
+    // For now, we just delete the firestore doc.
     if (!firestore) return;
     try {
-      // NOTE: This does not delete the user from Firebase Auth, only Firestore.
-      // A backend function would be required for full deletion.
       await deleteDoc(doc(firestore, 'users', userId));
-      toast({ title: "User Deleted", description: "The user has been removed from Firestore."});
+      toast({ title: "User Profile Deleted", description: "The user's profile has been removed from Firestore. Auth user must be deleted manually."});
     } catch (error) {
         console.error("Error deleting user: ", error);
-        toast({ variant: "destructive", title: "Deletion Failed", description: "Could not delete user."});
+        toast({ variant: "destructive", title: "Deletion Failed", description: "Could not delete user profile from Firestore."});
     }
   }
 
@@ -107,25 +109,29 @@ function UserManagement({ adminUser }: { adminUser: UserProfile }) {
                 <TableHead>Email</TableHead>
                 <TableHead>Role</TableHead>
                 <TableHead>School</TableHead>
+                <TableHead>Grade</TableHead>
+                <TableHead>Class</TableHead>
                 <TableHead className="text-right">Actions</TableHead>
                 </TableRow>
             </TableHeader>
             <TableBody>
                 {usersLoading ? (
-                    <TableRow><TableCell colSpan={5} className="text-center"><Loader2 className="inline-block animate-spin" /></TableCell></TableRow>
+                    <TableRow><TableCell colSpan={7} className="text-center"><Loader2 className="inline-block animate-spin" /></TableCell></TableRow>
                 ) : filteredUsers.map(user => (
                     <TableRow key={user.uid}>
                         <TableCell className="font-medium">{user.name}</TableCell>
                         <TableCell>{user.email}</TableCell>
                         <TableCell><Badge variant={user.role === 'admin' ? 'destructive' : 'secondary'}>{user.role}</Badge></TableCell>
                         <TableCell>{schoolList.find(s => s.id === user.school)?.name || user.school}</TableCell>
+                        <TableCell>{user.grade || 'N/A'}</TableCell>
+                        <TableCell>{user.class?.toUpperCase() || 'N/A'}</TableCell>
                         <TableCell className="text-right">
                            <AlertDialog>
                                 <AlertDialogTrigger asChild>
                                     <Button variant="ghost" size="icon" className="text-destructive"><Trash2 className="size-4"/></Button>
                                 </AlertDialogTrigger>
                                 <AlertDialogContent>
-                                    <AlertDialogHeader><AlertDialogTitle>Delete {user.name}?</AlertDialogTitle><AlertDialogDescription>This action cannot be undone. This will permanently delete the user's profile from the database.</AlertDialogDescription></AlertDialogHeader>
+                                    <AlertDialogHeader><AlertDialogTitle>Delete {user.name}?</AlertDialogTitle><AlertDialogDescription>This action cannot be undone. This will permanently delete the user's profile and account.</AlertDialogDescription></AlertDialogHeader>
                                     <AlertDialogFooter><AlertDialogCancel>Cancel</AlertDialogCancel><AlertDialogAction onClick={() => handleDeleteUser(user.uid)} className="bg-destructive hover:bg-destructive/90">Delete User</AlertDialogAction></AlertDialogFooter>
                                 </AlertDialogContent>
                             </AlertDialog>
@@ -147,6 +153,7 @@ export function AdminDashboard({ admin }: { admin: UserProfile }) {
   const [view, setView] = useState<'users' | 'classrooms'>('classrooms');
 
   const firestore = useFirestore();
+  const { toast } = useToast();
 
   const classroomId = useMemo(() => {
     if (!selectedSchool || !selectedGrade || !selectedClass) return null;
@@ -178,6 +185,17 @@ export function AdminDashboard({ admin }: { admin: UserProfile }) {
 
   const isLoading = classroomLoading || classmatesLoading || explanationsLoading;
   const schoolName = schoolList.find(s => s.id === selectedSchool)?.name || selectedSchool;
+  
+  const handleDeleteSchedule = async () => {
+    if (!firestore || !classroomId) return;
+    try {
+      await deleteDoc(doc(firestore, 'classrooms', classroomId));
+      toast({ title: "Schedule Deleted", description: "The schedule for this class has been removed."});
+    } catch (error) {
+      console.error("Error deleting schedule: ", error);
+      toast({ variant: "destructive", title: "Deletion Failed", description: "Could not delete schedule."});
+    }
+  };
 
   return (
     <div className="space-y-8">
@@ -227,8 +245,23 @@ export function AdminDashboard({ admin }: { admin: UserProfile }) {
 
             <Card>
                 <CardHeader>
-                    <CardTitle>Schedule for Class {selectedGrade}{selectedClass.toUpperCase()} at {schoolName}</CardTitle>
-                    <CardDescription>Viewing as an administrator.</CardDescription>
+                  <div className="flex justify-between items-center">
+                      <div>
+                        <CardTitle>Schedule for Class {selectedGrade}{selectedClass.toUpperCase()} at {schoolName}</CardTitle>
+                        <CardDescription>Viewing as an administrator.</CardDescription>
+                      </div>
+                      {classroomSchedule?.schedule && (
+                        <AlertDialog>
+                          <AlertDialogTrigger asChild>
+                              <Button variant="destructive" size="sm"><Trash2 className="mr-2"/>Delete Schedule</Button>
+                          </AlertDialogTrigger>
+                          <AlertDialogContent>
+                              <AlertDialogHeader><AlertDialogTitle>Delete Schedule?</AlertDialogTitle><AlertDialogDescription>This action cannot be undone. This will permanently delete the schedule for this classroom.</AlertDialogDescription></AlertDialogHeader>
+                              <AlertDialogFooter><AlertDialogCancel>Cancel</AlertDialogCancel><AlertDialogAction onClick={handleDeleteSchedule} className="bg-destructive hover:bg-destructive/90">Delete Schedule</AlertDialogAction></AlertDialogFooter>
+                          </AlertDialogContent>
+                      </AlertDialog>
+                      )}
+                  </div>
                 </CardHeader>
                 <CardContent>
                     {isLoading ? (
