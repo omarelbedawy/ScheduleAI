@@ -1,7 +1,6 @@
-
 "use client";
 
-import { useMemo, useState, useEffect } from "react";
+import { useMemo, useState } from "react";
 import type { UserProfile, Explanation } from "@/lib/types";
 import {
   Card,
@@ -40,13 +39,13 @@ import {
 import { Input } from "@/components/ui/input";
 import { ScheduleTable } from "./schedule-table";
 import { useFirestore, useCollection, useDoc, useMemoFirebase } from "@/firebase";
-import { doc, collection, query, where, deleteDoc } from "firebase/firestore";
+import { doc, collection, query, where, deleteDoc, getDocs, writeBatch } from "firebase/firestore";
 import { ClassmatesDashboard } from "./classmates-dashboard";
 import { Loader2, Trash2 } from "lucide-react";
-import { cn } from "@/lib/utils";
 import { schoolList } from "@/lib/schools";
 import { useToast } from "@/hooks/use-toast";
 import { Badge } from "@/components/ui/badge";
+import { deleteUserAction } from "@/app/actions";
 
 interface ClassroomSchedule {
   schedule: any[];
@@ -62,21 +61,45 @@ function UserManagement({ adminUser }: { adminUser: UserProfile }) {
     if (!firestore) return null;
     return collection(firestore, 'users');
   }, [firestore]);
-  const { data: users, loading: usersLoading } = useCollection<UserProfile>(usersQuery);
+
+  // We use a local state to manage users to allow optimistic UI updates on delete
+  const { data: initialUsers, loading: usersLoading } = useCollection<UserProfile>(usersQuery);
+  const [users, setUsers] = useState<UserProfile[]>([]);
   const [filter, setFilter] = useState("");
 
+  useState(() => {
+    if (initialUsers) {
+      setUsers(initialUsers);
+    }
+  });
+
+
   const handleDeleteUser = async (userId: string) => {
-    // This is a placeholder for a cloud function that would delete the user from Auth
-    console.log(`Requesting deletion for user: ${userId}`);
-    // In a real app, you would call a cloud function here.
-    // For now, we just delete the firestore doc.
     if (!firestore) return;
+    
+    // Optimistic UI update
+    const originalUsers = users;
+    setUsers(currentUsers => currentUsers.filter(u => u.uid !== userId));
+    
+    toast({ title: "Deleting User...", description: "This may take a moment."});
+
     try {
+      // First, delete the user from Firestore
       await deleteDoc(doc(firestore, 'users', userId));
-      toast({ title: "User Profile Deleted", description: "The user's profile has been removed from Firestore. Auth user must be deleted manually."});
-    } catch (error) {
+      
+      // Then, call the secure server action to delete from Auth
+      const result = await deleteUserAction({ userId });
+
+      if (result.success) {
+        toast({ title: "User Deleted", description: "The user has been completely removed from the system."});
+      } else {
+        throw new Error(result.message);
+      }
+    } catch (error: any) {
+        // If anything fails, revert the UI and show an error
+        setUsers(originalUsers);
         console.error("Error deleting user: ", error);
-        toast({ variant: "destructive", title: "Deletion Failed", description: "Could not delete user profile from Firestore."});
+        toast({ variant: "destructive", title: "Deletion Failed", description: error.message || "Could not delete user."});
     }
   }
 
@@ -131,7 +154,7 @@ function UserManagement({ adminUser }: { adminUser: UserProfile }) {
                                     <Button variant="ghost" size="icon" className="text-destructive"><Trash2 className="size-4"/></Button>
                                 </AlertDialogTrigger>
                                 <AlertDialogContent>
-                                    <AlertDialogHeader><AlertDialogTitle>Delete {user.name}?</AlertDialogTitle><AlertDialogDescription>This action cannot be undone. This will permanently delete the user's profile and account.</AlertDialogDescription></AlertDialogHeader>
+                                    <AlertDialogHeader><AlertDialogTitle>Delete {user.name}?</AlertDialogTitle><AlertDialogDescription>This action is irreversible and will permanently delete the user's account and all associated data.</AlertDialogDescription></AlertDialogHeader>
                                     <AlertDialogFooter><AlertDialogCancel>Cancel</AlertDialogCancel><AlertDialogAction onClick={() => handleDeleteUser(user.uid)} className="bg-destructive hover:bg-destructive/90">Delete User</AlertDialogAction></AlertDialogFooter>
                                 </AlertDialogContent>
                             </AlertDialog>
@@ -197,6 +220,29 @@ export function AdminDashboard({ admin }: { admin: UserProfile }) {
     }
   };
 
+  const handleDeleteAllExplanations = async () => {
+    if (!firestore || !classroomId) return;
+     try {
+        const explanationsRef = collection(firestore, "classrooms", classroomId, "explanations");
+        const q = query(explanationsRef);
+        const querySnapshot = await getDocs(q);
+        
+        if (querySnapshot.empty) {
+            toast({ title: "Nothing to Delete", description: "This classroom has no commitments." });
+            return;
+        }
+
+        const batch = writeBatch(firestore);
+        querySnapshot.forEach((doc) => batch.delete(doc.ref));
+        await batch.commit();
+
+        toast({ title: "All Commitments Deleted", description: "All student commitments for this classroom have been cleared." });
+    } catch (error) {
+        console.error("Error deleting all explanations: ", error);
+        toast({ variant: "destructive", title: "Deletion Failed", description: "Could not clear commitments."});
+    }
+  }
+
   return (
     <div className="space-y-8">
         <Card>
@@ -245,7 +291,7 @@ export function AdminDashboard({ admin }: { admin: UserProfile }) {
 
             <Card>
                 <CardHeader>
-                  <div className="flex justify-between items-center">
+                  <div className="flex flex-wrap justify-between items-center gap-4">
                       <div>
                         <CardTitle>Schedule for Class {selectedGrade}{selectedClass.toUpperCase()} at {schoolName}</CardTitle>
                         <CardDescription>Viewing as an administrator.</CardDescription>
@@ -287,6 +333,7 @@ export function AdminDashboard({ admin }: { admin: UserProfile }) {
                     explanations={explanations} 
                     currentUser={admin}
                     classroomId={classroomId}
+                    onDeleteAllExplanations={handleDeleteAllExplanations}
                 />
             )}
         </>

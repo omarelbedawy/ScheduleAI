@@ -1,11 +1,10 @@
-
 "use client";
 
 import type { UserProfile, Explanation, ExplanationContributor } from "@/lib/types";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Users, BookUser, CalendarDays, Clock, Trash2, Check, X, Hourglass, ThumbsUp, ThumbsDown, CheckCircle, XCircle, HelpCircle } from "lucide-react";
+import { Users, BookUser, CalendarDays, Clock, Trash2, Check, X, CheckCircle, XCircle, HelpCircle } from "lucide-react";
 import { Badge } from "../ui/badge";
 import { Button } from "../ui/button";
 import {
@@ -20,7 +19,7 @@ import {
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
 import { useFirestore } from "@/firebase";
-import { doc, deleteDoc, updateDoc, writeBatch, collection, getDocs, query } from "firebase/firestore";
+import { doc, deleteDoc, updateDoc } from "firebase/firestore";
 import { useToast } from "@/hooks/use-toast";
 import { format, formatDistanceToNow } from 'date-fns';
 import { cn } from "@/lib/utils";
@@ -30,10 +29,6 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from "@/components/ui/tooltip"
-import { useState } from "react";
-import { Input } from "../ui/input";
-import { Label } from "../ui/label";
-
 
 function getInitials(name: string) {
     if (!name) return '';
@@ -65,64 +60,6 @@ function ContributorList({ contributors }: { contributors: ExplanationContributo
     )
 }
 
-function InvitationManager({ 
-    explanation,
-    currentUser,
-    classroomId,
-    classmates,
-} : {
-    explanation: Explanation;
-    currentUser: UserProfile | null;
-    classroomId: string | null;
-    classmates: UserProfile[] | null;
-}) {
-    const firestore = useFirestore();
-    const { toast } = useToast();
-    const userInvite = (explanation.contributors || []).find(c => c.userId === currentUser?.uid && c.status === 'pending');
-    
-    const owner = (classmates || []).find(c => c.uid === explanation.ownerId);
-
-    if (!userInvite) return null;
-
-    const handleInvitationResponse = async (accept: boolean) => {
-        if (!firestore || !classroomId || !currentUser?.uid) return;
-        const explanationRef = doc(firestore, 'classrooms', classroomId, 'explanations', explanation.id);
-
-        const newContributors = (explanation.contributors || []).map(c => 
-            c.userId === currentUser.uid ? { ...c, status: accept ? 'accepted' : 'declined' } : c
-        );
-
-        try {
-            await updateDoc(explanationRef, { contributors: newContributors });
-            toast({
-                title: `Invitation ${accept ? 'Accepted' : 'Declined'}`,
-            });
-        } catch (error) {
-            console.error("Error responding to invitation:", error);
-            toast({
-                variant: 'destructive',
-                title: "Error",
-                description: "Could not update your response. Please try again."
-            })
-        }
-    }
-
-    return (
-        <Card className="my-2 bg-accent/20 border-accent/50">
-            <CardContent className="p-3 flex items-center justify-between">
-                <p className="text-sm font-medium">
-                  <span className="font-bold">{owner?.name || 'A classmate'}</span> invited you to explain <span className="font-bold">{explanation.subject}</span>.
-                </p>
-                <div className="flex gap-2">
-                    <Button size="sm" onClick={() => handleInvitationResponse(true)}><ThumbsUp className="mr-1 h-4 w-4"/> Accept</Button>
-                    <Button size="sm" variant="destructive" onClick={() => handleInvitationResponse(false)}><ThumbsDown className="mr-1 h-4 w-4"/> Decline</Button>
-                </div>
-            </CardContent>
-        </Card>
-    )
-}
-
-
 function ExplanationCard({ 
     explanation, 
     currentUser, 
@@ -135,9 +72,14 @@ function ExplanationCard({
     const firestore = useFirestore();
     const { toast } = useToast();
 
+    const isOwner = currentUser?.uid === explanation.ownerId;
     const isTeacher = currentUser?.role === 'teacher';
     const isAdmin = currentUser?.role === 'admin';
     const isReviewed = explanation.completionStatus === 'explained' || explanation.completionStatus === 'not-explained';
+    
+    // Only admins or the owner can delete, and only for upcoming sessions
+    const canDelete = (isAdmin || isOwner) && explanation.status === 'Upcoming';
+
 
     const createdAtDate = explanation.createdAt?.toDate();
     const timeAgo = createdAtDate ? formatDistanceToNow(createdAtDate, { addSuffix: true }) : 'a while ago';
@@ -218,7 +160,7 @@ function ExplanationCard({
                     : <Badge variant="outline"><Clock className="mr-1 h-3 w-3"/> Finished</Badge>
                 }
                 
-                {isAdmin && (
+                {canDelete && (
                     <AlertDialog>
                         <AlertDialogTrigger asChild>
                             <Button variant="ghost" size="icon" className="h-7 w-7 text-muted-foreground hover:text-destructive opacity-0 group-hover:opacity-100 transition-opacity">
@@ -229,13 +171,13 @@ function ExplanationCard({
                             <AlertDialogHeader>
                             <AlertDialogTitle>Are you absolutely sure?</AlertDialogTitle>
                             <AlertDialogDescription>
-                                This action will permanently delete this explanation commitment. This cannot be undone.
+                                This will permanently delete your commitment to explain this topic. This cannot be undone.
                             </AlertDialogDescription>
                             </AlertDialogHeader>
                             <AlertDialogFooter>
                             <AlertDialogCancel>Keep Commitment</AlertDialogCancel>
                             <AlertDialogAction onClick={handleDelete} className="bg-destructive hover:bg-destructive/90">
-                                Yes, Delete It
+                                Yes, Cancel It
                             </AlertDialogAction>
                             </AlertDialogFooter>
                         </AlertDialogContent>
@@ -282,111 +224,13 @@ function ExplanationCard({
     )
 }
 
-function DeleteAllDialog({ classroomId }: { classroomId: string | null }) {
-    const firestore = useFirestore();
-    const { toast } = useToast();
-    const [password, setPassword] = useState("");
-    const [isOpen, setIsOpen] = useState(false);
-    const correctPassword = "Iamtheonlyadminonearth";
-
-    const handleDeleteAll = async () => {
-        if (password !== correctPassword) {
-            toast({
-                variant: "destructive",
-                title: "Incorrect Password",
-                description: "You are not authorized to perform this action.",
-            });
-            return;
-        }
-
-        if (!firestore || !classroomId) {
-            toast({
-                variant: "destructive",
-                title: "Error",
-                description: "Could not connect to the database.",
-            });
-            return;
-        }
-
-        try {
-            const explanationsRef = collection(firestore, "classrooms", classroomId, "explanations");
-            const q = query(explanationsRef);
-            const querySnapshot = await getDocs(q);
-            
-            if (querySnapshot.empty) {
-                 toast({
-                    title: "Nothing to Delete",
-                    description: "There are no explanation commitments to delete.",
-                });
-                setIsOpen(false);
-                return;
-            }
-
-            const batch = writeBatch(firestore);
-            querySnapshot.forEach((doc) => {
-                batch.delete(doc.ref);
-            });
-            await batch.commit();
-
-            toast({
-                title: "Success!",
-                description: "All explanation commitments have been deleted.",
-            });
-            setPassword("");
-            setIsOpen(false);
-        } catch (error) {
-            console.error("Error deleting all explanations: ", error);
-            toast({
-                variant: "destructive",
-                title: "Deletion Failed",
-                description: "There was a problem deleting the commitments. Please try again.",
-            });
-        }
-    };
-
-    return (
-        <AlertDialog open={isOpen} onOpenChange={setIsOpen}>
-            <AlertDialogTrigger asChild>
-                <Button variant="destructive" size="sm" className="font-bold"><Trash2 className="mr-2"/>Delete all sessions</Button>
-            </AlertDialogTrigger>
-            <AlertDialogContent>
-                <AlertDialogHeader>
-                    <AlertDialogTitle>Are you the admin?</AlertDialogTitle>
-                    <AlertDialogDescription>
-                        This is a destructive action and will permanently delete all student commitments for this classroom. To proceed, please enter the admin password.
-                    </AlertDialogDescription>
-                </AlertDialogHeader>
-                <div className="space-y-2">
-                    <Label htmlFor="admin-password">Admin Password</Label>
-                    <Input
-                        id="admin-password"
-                        type="password"
-                        value={password}
-                        onChange={(e) => setPassword(e.target.value)}
-                        placeholder="Enter the secret password"
-                    />
-                </div>
-                <AlertDialogFooter>
-                    <AlertDialogCancel onClick={() => setPassword("")}>Cancel</AlertDialogCancel>
-                    <AlertDialogAction onClick={handleDeleteAll} disabled={password !== correctPassword}>
-                        Confirm Deletion
-                    </AlertDialogAction>
-                </AlertDialogFooter>
-            </AlertDialogContent>
-        </AlertDialog>
-    );
-}
-
-export function ClassmatesDashboard({ classmates, explanations, currentUser, classroomId }: { 
+export function ClassmatesDashboard({ classmates, explanations, currentUser, classroomId, onDeleteAllExplanations }: { 
     classmates: UserProfile[] | null;
     explanations: Explanation[] | null;
     currentUser: UserProfile | null;
     classroomId: string | null;
+    onDeleteAllExplanations?: () => Promise<void>;
 }) {
-
-    const pendingInvitations = (explanations || []).filter(exp => 
-        (exp.contributors || []).some(c => c.userId === currentUser?.uid && c.status === 'pending')
-    );
     const isAdmin = currentUser?.role === 'admin';
 
     return (
@@ -402,21 +246,28 @@ export function ClassmatesDashboard({ classmates, explanations, currentUser, cla
                             </CardDescription>
                         </div>
                     </div>
-                    {isAdmin && <DeleteAllDialog classroomId={classroomId} />}
+                     {isAdmin && onDeleteAllExplanations && (
+                        <AlertDialog>
+                            <AlertDialogTrigger asChild>
+                               <Button variant="destructive" size="sm"><Trash2 className="mr-2"/>Delete All Commitments</Button>
+                            </AlertDialogTrigger>
+                            <AlertDialogContent>
+                                <AlertDialogHeader>
+                                    <AlertDialogTitle>Delete All Commitments?</AlertDialogTitle>
+                                    <AlertDialogDescription>
+                                        This action cannot be undone. This will permanently delete all {explanations?.length || 0} student commitments for this classroom.
+                                    </AlertDialogDescription>
+                                </AlertDialogHeader>
+                                <AlertDialogFooter>
+                                    <AlertDialogCancel>Cancel</AlertDialogCancel>
+                                    <AlertDialogAction onClick={onDeleteAllExplanations} className="bg-destructive hover:bg-destructive/90">
+                                        Yes, Delete Everything
+                                    </AlertDialogAction>
+                                </AlertDialogFooter>
+                            </AlertDialogContent>
+                        </AlertDialog>
+                    )}
                 </div>
-                 {pendingInvitations.length > 0 && (
-                    <div className="!mt-4 space-y-2">
-                        {pendingInvitations.map(exp => (
-                            <InvitationManager
-                                key={exp.id}
-                                explanation={exp}
-                                currentUser={currentUser}
-                                classroomId={classroomId}
-                                classmates={classmates}
-                            />
-                        ))}
-                    </div>
-                )}
             </CardHeader>
             <CardContent className="space-y-6">
                 {!classmates ? (
