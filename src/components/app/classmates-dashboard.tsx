@@ -1,3 +1,4 @@
+
 "use client";
 
 import type { UserProfile, Explanation, ExplanationContributor } from "@/lib/types";
@@ -77,8 +78,7 @@ function ExplanationCard({
     const isAdmin = currentUser?.role === 'admin';
     const isReviewed = explanation.completionStatus === 'explained' || explanation.completionStatus === 'not-explained';
     
-    // Only admins or the owner can delete, and only for upcoming sessions
-    const canDelete = (isAdmin || isOwner) && explanation.status === 'Upcoming';
+    const canDelete = (isAdmin || isOwner);
 
 
     const createdAtDate = explanation.createdAt?.toDate();
@@ -171,7 +171,7 @@ function ExplanationCard({
                             <AlertDialogHeader>
                             <AlertDialogTitle>Are you absolutely sure?</AlertDialogTitle>
                             <AlertDialogDescription>
-                                This will permanently delete your commitment to explain this topic. This cannot be undone.
+                                This will permanently delete this commitment to explain this topic. This cannot be undone.
                             </AlertDialogDescription>
                             </AlertDialogHeader>
                             <AlertDialogFooter>
@@ -326,3 +326,5 @@ export function ClassmatesDashboard({ classmates, explanations, currentUser, cla
         </Card>
     );
 }
+
+    

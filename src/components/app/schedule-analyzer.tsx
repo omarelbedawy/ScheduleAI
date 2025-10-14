@@ -111,22 +111,22 @@ export function ScheduleAnalyzer() {
   
       const pastExplanations = upcomingExplanations.filter(exp => {
         const expDate = (exp.explanationDate as Timestamp)?.toDate();
-        if (!expDate) return false;
+        if (!expDate) return false; // Skip if no date
 
         const expDateStart = startOfDay(expDate);
 
-        // If the explanation date is before today, it's finished.
+        // If the explanation date is before today, it's definitely finished.
         if (isBefore(expDateStart, todayStart)) {
             return true;
         }
 
-        // If the explanation is for today, check the time.
+        // If the explanation is for today, check the session time.
         if (expDateStart.getTime() === todayStart.getTime()) {
             const sessionTime = scheduleTimeMap.get(exp.session);
-            if (!sessionTime) return false;
+            if (!sessionTime) return false; // Can't determine if time is not found
 
             const endTimeString = sessionTime.split('–')[1];
-            if (!endTimeString) return false;
+            if (!endTimeString) return false; // Malformed time range
 
             const [hours, minutes] = endTimeString.split(':').map(Number);
             
@@ -136,6 +136,7 @@ export function ScheduleAnalyzer() {
             return nowTime > sessionEndTime;
         }
 
+        // It's a future date, so it's not finished yet.
         return false;
       });
   
@@ -149,7 +150,7 @@ export function ScheduleAnalyzer() {
           await batch.commit();
           toast({
             title: "Session Status Updated",
-            description: `Finished sessions have been updated.`,
+            description: `${pastExplanations.length} session(s) have been marked as Finished.`,
           });
         } catch (error) {
           console.error("Failed to archive explanations:", error);
@@ -157,10 +158,15 @@ export function ScheduleAnalyzer() {
       }
     };
     
-    // Run this check once on load
+    // Run this check periodically (e.g., every minute)
+    const intervalId = setInterval(archivePastExplanations, 60000);
+
+    // Also run it once on load
     archivePastExplanations();
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [firestore, classroomId, explanationsLoading, classroomSchedule]);
+
+    // Clean up the interval on component unmount
+    return () => clearInterval(intervalId);
+  }, [firestore, classroomId, explanations, explanationsLoading, classroomSchedule, toast]);
 
 
   useEffect(() => {
@@ -637,6 +643,8 @@ function UploadCard({
     </Card>
   );
 }
+
+    
 
     
 
