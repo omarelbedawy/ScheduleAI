@@ -63,7 +63,6 @@ function UserManagement({ adminUser }: { adminUser: UserProfile }) {
     return collection(firestore, 'users');
   }, [firestore]);
 
-  // We use a local state to manage users to allow optimistic UI updates on delete
   const { data: initialUsers, loading: usersLoading } = useCollection<UserProfile>(usersQuery);
   const [users, setUsers] = useState<UserProfile[]>([]);
   const [filter, setFilter] = useState("");
@@ -82,14 +81,13 @@ function UserManagement({ adminUser }: { adminUser: UserProfile }) {
     const originalUsers = users;
     setUsers(currentUsers => currentUsers.filter(u => u.uid !== userId));
     
-    toast({ title: "Deleting User...", description: "This may take a moment."});
+    toast({ title: "Deleting User Data...", description: "Removing user profile from the database."});
 
     try {
-      // First, delete the user from Firestore
       const result = await deleteUserAction({ userId });
 
       if (result.success) {
-        toast({ title: "User Deleted", description: "The user has been completely removed from the system."});
+        toast({ title: "User Data Deleted", description: "The user's profile has been removed. You may need to manually delete them from Firebase Authentication."});
       } else {
         throw new Error(result.message);
       }
@@ -97,7 +95,7 @@ function UserManagement({ adminUser }: { adminUser: UserProfile }) {
         // If anything fails, revert the UI and show an error
         setUsers(originalUsers);
         console.error("Error deleting user: ", error);
-        toast({ variant: "destructive", title: "Deletion Failed", description: error.message || "Could not delete user."});
+        toast({ variant: "destructive", title: "Deletion Failed", description: error.message || "Could not delete user's data."});
     }
   }
 
@@ -152,8 +150,8 @@ function UserManagement({ adminUser }: { adminUser: UserProfile }) {
                                     <Button variant="ghost" size="icon" className="text-destructive"><Trash2 className="size-4"/></Button>
                                 </AlertDialogTrigger>
                                 <AlertDialogContent>
-                                    <AlertDialogHeader><AlertDialogTitle>Delete {user.name}?</AlertDialogTitle><AlertDialogDescription>This action is irreversible and will permanently delete the user's account and all associated data from both the database and authentication service.</AlertDialogDescription></AlertDialogHeader>
-                                    <AlertDialogFooter><AlertDialogCancel>Cancel</AlertDialogCancel><AlertDialogAction onClick={() => handleDeleteUser(user.uid)} className="bg-destructive hover:bg-destructive/90">Delete User</AlertDialogAction></AlertDialogFooter>
+                                    <AlertDialogHeader><AlertDialogTitle>Delete {user.name}'s Data?</AlertDialogTitle><AlertDialogDescription>This action is irreversible and will permanently delete the user's profile data from the database. It will not delete their authentication account.</AlertDialogDescription></AlertDialogHeader>
+                                    <AlertDialogFooter><AlertDialogCancel>Cancel</AlertDialogCancel><AlertDialogAction onClick={() => handleDeleteUser(user.uid)} className="bg-destructive hover:bg-destructive/90">Delete User Data</AlertDialogAction></AlertDialogFooter>
                                 </AlertDialogContent>
                             </AlertDialog>
                         </TableCell>
