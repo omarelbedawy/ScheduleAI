@@ -10,13 +10,12 @@ import { ai } from '@/ai/genkit';
 import { z } from 'zod';
 import { getAuth } from 'firebase-admin/auth';
 import { initializeApp, getApps } from 'firebase-admin/app';
-import { firebaseConfig } from '@/firebase/config';
 
 // Initialize Firebase Admin SDK if it hasn't been already.
 // This runs in a secure server environment.
 if (getApps().length === 0) {
   initializeApp({
-    projectId: firebaseConfig.projectId,
+    projectId: "scheduleai-c6092",
   });
 }
 
