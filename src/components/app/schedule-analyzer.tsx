@@ -570,9 +570,3 @@ function UploadCard({
     </Card>
   );
 }
-
-    
-
-    
-
-    
