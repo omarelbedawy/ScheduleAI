@@ -23,6 +23,7 @@ import { useFirestore } from "@/firebase";
 import { doc, deleteDoc, updateDoc } from "firebase/firestore";
 import { useToast } from "@/hooks/use-toast";
 import { format, formatDistanceToNow } from 'date-fns';
+import { cn } from "@/lib/utils";
 
 function getInitials(name: string) {
     if (!name) return '';
@@ -128,7 +129,9 @@ function ExplanationCard({
 
 
     return (
-        <Card className="bg-card/50 relative group">
+        <Card className={cn("bg-card/50 relative group", {
+            "border-destructive shadow-lg": explanation.completionStatus === 'not-explained'
+        })}>
              <div className="absolute top-2 right-2 flex items-center gap-2">
                 {explanation.status === 'Upcoming' 
                     ? <Badge variant="outline">Upcoming</Badge>
@@ -301,5 +304,3 @@ export function ClassmatesDashboard({ classmates, explanations, currentUser, cla
         </Card>
     );
 }
-
-    
