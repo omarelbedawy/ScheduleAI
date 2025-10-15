@@ -30,7 +30,7 @@ import Image from "next/image";
 import { ScheduleTable } from "./schedule-table";
 import { useUser } from "@/firebase/auth/use-user";
 import { useFirestore, useDoc, useMemoFirebase, useCollection } from "@/firebase";
-import { doc, setDoc, serverTimestamp, collection, query, where, getDocs, writeBatch } from "firebase/firestore";
+import { doc, setDoc, serverTimestamp, collection, query, where, writeBatch, updateDoc } from "firebase/firestore";
 import type { UserProfile, Explanation } from "@/lib/types";
 import { errorEmitter } from "@/firebase/error-emitter";
 import { FirestorePermissionError, type SecurityRuleContext } from "@/firebase/errors";
@@ -45,6 +45,23 @@ interface ClassroomSchedule {
   lastUpdatedBy?: string;
   updatedAt?: any;
 }
+
+// Helper to get the end time of a session
+const getSessionEndTime = (
+  session: string,
+  schedule: ScheduleRow[]
+): { hours: number; minutes: number } | null => {
+  const sessionRow = schedule.find((r) => r.session === session);
+  if (!sessionRow || !sessionRow.time) return null;
+  const timeParts = sessionRow.time.split("–");
+  if (timeParts.length < 2) return null;
+
+  const endTimeStr = timeParts[1];
+  const [hours, minutes] = endTimeStr.split(":").map(Number);
+  // Handle PM times if needed, assuming 24h format or simple AM/PM
+  // For this school schedule, times past noon (13:00) are handled correctly.
+  return { hours, minutes };
+};
 
 
 export function ScheduleAnalyzer() {
@@ -109,6 +126,50 @@ export function ScheduleAnalyzer() {
       setState("idle");
     }
   }, [isLoading, classroomSchedule, user?.uid]);
+  
+  // Effect to automatically update explanation status
+  useEffect(() => {
+    if (!firestore || !explanations || !classroomSchedule?.schedule || !classroomId) return;
+
+    const checkAndUpdateStatuses = async () => {
+      const now = new Date();
+      const upcomingExplanations = explanations.filter(e => e.status === 'Upcoming');
+
+      if (upcomingExplanations.length === 0) return;
+
+      const batch = writeBatch(firestore);
+      let updatesMade = 0;
+
+      for (const exp of upcomingExplanations) {
+        const sessionEndTime = getSessionEndTime(exp.session, classroomSchedule.schedule);
+        if (!sessionEndTime || !exp.explanationDate) continue;
+
+        const explanationEndDateTime = new Date(exp.explanationDate.toDate());
+        explanationEndDateTime.setHours(sessionEndTime.hours, sessionEndTime.minutes, 0, 0);
+
+        if (now > explanationEndDateTime) {
+          const expRef = doc(firestore, 'classrooms', classroomId, 'explanations', exp.id);
+          batch.update(expRef, { status: 'Finished' });
+          updatesMade++;
+        }
+      }
+
+      if (updatesMade > 0) {
+        try {
+          await batch.commit();
+        } catch (error) {
+          console.error("Error auto-updating explanation statuses:", error);
+        }
+      }
+    };
+    
+    // Run once on load and then every minute
+    checkAndUpdateStatuses();
+    const intervalId = setInterval(checkAndUpdateStatuses, 60000); 
+
+    return () => clearInterval(intervalId);
+
+  }, [explanations, classroomSchedule, firestore, classroomId]);
 
 
   const handleFileSelect = (selectedFile: File | null) => {
@@ -184,7 +245,7 @@ export function ScheduleAnalyzer() {
           updatedAt: serverTimestamp(),
         };
 
-        setDoc(classroomDocRef, newScheduleData).catch(async (serverError) => {
+        setDoc(classroomDocRef, newScheduleData, { merge: true }).catch(async (serverError) => {
           const permissionError = new FirestorePermissionError({
             path: classroomDocRef.path,
             operation: 'write',
@@ -305,7 +366,7 @@ export function ScheduleAnalyzer() {
         onDragOver={onDragOver}
         onDragLeave={onDragLeave}
         onDrop={onDrop}
-        fileInputRef={fileInputRef}
+        fileInputref={fileInputRef}
         onFileChange={onFileChange}
         state={state}
         previewUrl={previewUrl}
@@ -567,3 +628,5 @@ function UploadCard({
     </Card>
   );
 }
+
+    
