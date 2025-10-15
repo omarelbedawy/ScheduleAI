@@ -53,13 +53,15 @@ const getSessionEndTime = (
 ): { hours: number; minutes: number } | null => {
   const sessionRow = schedule.find((r) => r.session === session);
   if (!sessionRow || !sessionRow.time) return null;
+  // Handles time formats like "7:45–9:05" or "13:45–15:00"
   const timeParts = sessionRow.time.split("–");
   if (timeParts.length < 2) return null;
 
-  const endTimeStr = timeParts[1];
+  const endTimeStr = timeParts[1].trim();
   const [hours, minutes] = endTimeStr.split(":").map(Number);
-  // Handle PM times if needed, assuming 24h format or simple AM/PM
-  // For this school schedule, times past noon (13:00) are handled correctly.
+  
+  if (isNaN(hours) || isNaN(minutes)) return null;
+
   return { hours, minutes };
 };
 
@@ -366,7 +368,7 @@ export function ScheduleAnalyzer() {
         onDragOver={onDragOver}
         onDragLeave={onDragLeave}
         onDrop={onDrop}
-        fileInputref={fileInputRef}
+        fileInputRef={fileInputRef}
         onFileChange={onFileChange}
         state={state}
         previewUrl={previewUrl}
@@ -628,5 +630,7 @@ function UploadCard({
     </Card>
   );
 }
+
+    
 
     
