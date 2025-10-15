@@ -1,6 +1,7 @@
 'use server';
 
 import { analyzeScheduleFromImage, AnalyzeScheduleFromImageInput, AnalyzeScheduleFromImageOutput } from '@/ai/flows/analyze-schedule-from-image';
+import { deleteUser } from '@/ai/flows/delete-user';
 import { doc, deleteDoc } from 'firebase/firestore';
 import { db } from '@/firebase/server';
 
@@ -30,10 +31,9 @@ interface DeleteUserInput {
 }
 
 /**
- * A server action that securely deletes a user from Firestore.
- * Note: This does not delete the user from Firebase Authentication due to security constraints.
+ * A server action that securely deletes a user from both Firestore and Firebase Authentication.
  * @param input An object containing the userId of the user to delete.
- * @returns A promise that resolves when the user is deleted from Firestore.
+ * @returns A promise that resolves when the user is deleted.
  */
 export async function deleteUserAction(
   input: DeleteUserInput
@@ -42,10 +42,15 @@ export async function deleteUserAction(
     if (!db) {
         throw new Error('Firestore is not initialized on the server.');
     }
+    // Delete from Firestore first
     await deleteDoc(doc(db, "users", input.userId));
+
+    // Then, call the Genkit flow to delete from Firebase Auth
+    await deleteUser({ userId: input.userId });
+
     return { success: true };
   } catch (error: any) {
-    console.error('Error deleting user from Firestore:', error);
+    console.error('Error deleting user:', error);
     return { success: false, message: error.message || 'An unexpected error occurred during user deletion.' };
   }
 }

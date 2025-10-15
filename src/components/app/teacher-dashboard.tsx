@@ -12,7 +12,7 @@ import {
 } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { ScheduleTable } from "./schedule-table";
-import { useFirestore, useDoc, useCollection, useMemoFirebase } from "@/firebase";
+import { useFirestore, useDoc, useCollection } from "@/firebase";
 import { doc, collection, query, where } from "firebase/firestore";
 import { ClassmatesDashboard } from "./classmates-dashboard";
 import { Loader2 } from "lucide-react";
@@ -43,13 +43,13 @@ export function TeacherDashboard({ teacher }: { teacher: UserProfile }) {
     return `${teacher.school}-${selectedClass.grade}-${selectedClass.class}`;
   }, [teacher.school, selectedClass]);
 
-  const classroomDocRef = useMemoFirebase(() => {
+  const classroomDocRef = useMemo(() => {
     if (!firestore || !classroomId) return null;
     return doc(firestore, 'classrooms', classroomId);
   }, [firestore, classroomId]);
   const { data: classroomSchedule, loading: classroomLoading } = useDoc<ClassroomSchedule>(classroomDocRef);
 
-  const classmatesQuery = useMemoFirebase(() => {
+  const classmatesQuery = useMemo(() => {
     if (!firestore || !selectedClass || !teacher.school) return null;
     return query(
       collection(firestore, "users"),
@@ -60,7 +60,7 @@ export function TeacherDashboard({ teacher }: { teacher: UserProfile }) {
   }, [firestore, teacher.school, selectedClass]);
   const { data: classmates, loading: classmatesLoading } = useCollection<UserProfile>(classmatesQuery);
 
-  const explanationsQuery = useMemoFirebase(() => {
+  const explanationsQuery = useMemo(() => {
     if (!firestore || !classroomId) return null;
     return query(
         collection(firestore, 'classrooms', classroomId, 'explanations'),

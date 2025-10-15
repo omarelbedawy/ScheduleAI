@@ -39,7 +39,7 @@ import {
 } from "@/components/ui/alert-dialog";
 import { Input } from "@/components/ui/input";
 import { ScheduleTable } from "./schedule-table";
-import { useFirestore, useCollection, useDoc, useMemoFirebase } from "@/firebase";
+import { useFirestore, useCollection, useDoc } from "@/firebase";
 import { doc, collection, query, where, deleteDoc, getDocs, writeBatch } from "firebase/firestore";
 import { ClassmatesDashboard } from "./classmates-dashboard";
 import { Loader2, Trash2 } from "lucide-react";
@@ -58,7 +58,7 @@ interface ClassroomSchedule {
 function UserManagement({ adminUser }: { adminUser: UserProfile }) {
   const firestore = useFirestore();
   const { toast } = useToast();
-  const usersQuery = useMemoFirebase(() => {
+  const usersQuery = useMemo(() => {
     if (!firestore) return null;
     return collection(firestore, 'users');
   }, [firestore]);
@@ -179,13 +179,13 @@ export function AdminDashboard({ admin }: { admin: UserProfile }) {
     return `${selectedSchool}-${selectedGrade}-${selectedClass}`;
   }, [selectedSchool, selectedGrade, selectedClass]);
 
-  const classroomDocRef = useMemoFirebase(() => {
+  const classroomDocRef = useMemo(() => {
     if (!firestore || !classroomId) return null;
     return doc(firestore, 'classrooms', classroomId);
   }, [firestore, classroomId]);
   const { data: classroomSchedule, loading: classroomLoading } = useDoc<ClassroomSchedule>(classroomDocRef);
 
-  const classmatesQuery = useMemoFirebase(() => {
+  const classmatesQuery = useMemo(() => {
     if (!firestore || !selectedSchool || !selectedGrade || !selectedClass) return null;
     return query(
       collection(firestore, "users"),
@@ -196,7 +196,7 @@ export function AdminDashboard({ admin }: { admin: UserProfile }) {
   }, [firestore, selectedSchool, selectedGrade, selectedClass]);
   const { data: classmates, loading: classmatesLoading } = useCollection<UserProfile>(classmatesQuery);
 
-  const explanationsQuery = useMemoFirebase(() => {
+  const explanationsQuery = useMemo(() => {
     if (!firestore || !classroomId) return null;
     return collection(firestore, 'classrooms', classroomId, 'explanations');
   }, [firestore, classroomId]);

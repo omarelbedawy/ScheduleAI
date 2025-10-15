@@ -30,13 +30,12 @@ import Image from "next/image";
 import { ScheduleTable } from "./schedule-table";
 import { useUser } from "@/firebase/auth/use-user";
 import { useFirestore, useDoc, useMemoFirebase, useCollection } from "@/firebase";
-import { doc, setDoc, serverTimestamp, collection, query, where, getDocs, writeBatch, Timestamp } from "firebase/firestore";
+import { doc, setDoc, serverTimestamp, collection, query, where, getDocs, writeBatch } from "firebase/firestore";
 import type { UserProfile, Explanation } from "@/lib/types";
 import { errorEmitter } from "@/firebase/error-emitter";
 import { FirestorePermissionError, type SecurityRuleContext } from "@/firebase/errors";
 import { schoolList } from "@/lib/schools";
 import { ClassmatesDashboard } from "./classmates-dashboard";
-import { isBefore, startOfDay } from 'date-fns';
 
 type AnalysisState = "idle" | "previewing" | "loading" | "displaying" | "initializing";
 type ScheduleRow = AnalyzeScheduleFromImageOutput["schedule"][number];
@@ -96,78 +95,6 @@ export function ScheduleAnalyzer() {
   const { data: explanations, loading: explanationsLoading } = useCollection<Explanation>(explanationsQuery);
 
   const isLoading = userLoading || userProfileLoading || classroomLoading || classmatesLoading || explanationsLoading;
-
-
-  // Effect for archiving old explanations
-  useEffect(() => {
-    if (!firestore || !classroomId || explanationsLoading || !explanations || !classroomSchedule?.schedule) return;
-  
-    const archivePastExplanations = async () => {
-      const now = new Date();
-      const todayStart = startOfDay(now);
-      const upcomingExplanations = (explanations || []).filter(exp => exp.status === 'Upcoming');
-  
-      const scheduleTimeMap = new Map(classroomSchedule.schedule.map(row => [row.session, row.time]));
-  
-      const pastExplanations = upcomingExplanations.filter(exp => {
-        const expDate = (exp.explanationDate as Timestamp)?.toDate();
-        if (!expDate) return false; // Skip if no date
-
-        const expDateStart = startOfDay(expDate);
-
-        // If the explanation date is before today, it's definitely finished.
-        if (isBefore(expDateStart, todayStart)) {
-            return true;
-        }
-
-        // If the explanation is for today, check the session time.
-        if (expDateStart.getTime() === todayStart.getTime()) {
-            const sessionTime = scheduleTimeMap.get(exp.session);
-            if (!sessionTime) return false; // Can't determine if time is not found
-
-            const endTimeString = sessionTime.split('–')[1];
-            if (!endTimeString) return false; // Malformed time range
-
-            const [hours, minutes] = endTimeString.split(':').map(Number);
-            
-            const nowTime = now.getHours() * 60 + now.getMinutes();
-            const sessionEndTime = hours * 60 + minutes;
-
-            return nowTime > sessionEndTime;
-        }
-
-        // It's a future date, so it's not finished yet.
-        return false;
-      });
-  
-      if (pastExplanations.length > 0) {
-        const batch = writeBatch(firestore);
-        pastExplanations.forEach(exp => {
-          const expRef = doc(firestore, 'classrooms', classroomId, 'explanations', exp.id);
-          batch.update(expRef, { status: 'Finished' });
-        });
-        try {
-          await batch.commit();
-          toast({
-            title: "Session Status Updated",
-            description: `${pastExplanations.length} session(s) have been marked as Finished.`,
-          });
-        } catch (error) {
-          console.error("Failed to archive explanations:", error);
-        }
-      }
-    };
-    
-    // Run this check periodically (e.g., every minute)
-    const intervalId = setInterval(archivePastExplanations, 60000);
-
-    // Also run it once on load
-    archivePastExplanations();
-
-    // Clean up the interval on component unmount
-    return () => clearInterval(intervalId);
-  }, [firestore, classroomId, explanations, explanationsLoading, classroomSchedule, toast]);
-
 
   useEffect(() => {
     if (isLoading) {

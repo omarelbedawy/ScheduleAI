@@ -5,7 +5,7 @@ import type { UserProfile, Explanation, ExplanationContributor } from "@/lib/typ
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Users, BookUser, CalendarDays, Clock, Trash2, Check, X, CheckCircle, XCircle, HelpCircle } from "lucide-react";
+import { Users, BookUser, CalendarDays, Clock, Trash2, Check, X } from "lucide-react";
 import { Badge } from "../ui/badge";
 import { Button } from "../ui/button";
 import {
@@ -23,13 +23,6 @@ import { useFirestore } from "@/firebase";
 import { doc, deleteDoc, updateDoc } from "firebase/firestore";
 import { useToast } from "@/hooks/use-toast";
 import { format, formatDistanceToNow } from 'date-fns';
-import { cn } from "@/lib/utils";
-import {
-  Tooltip,
-  TooltipContent,
-  TooltipProvider,
-  TooltipTrigger,
-} from "@/components/ui/tooltip"
 
 function getInitials(name: string) {
     if (!name) return '';
@@ -132,32 +125,13 @@ function ExplanationCard({
         }
     }
 
-    const CompletionStatusIcon = () => {
-        switch (explanation.completionStatus) {
-            case 'explained':
-                return <TooltipProvider><Tooltip><TooltipTrigger asChild><CheckCircle className="size-4 text-green-500" /></TooltipTrigger><TooltipContent><p>Explained</p></TooltipContent></Tooltip></TooltipProvider>;
-            case 'not-explained':
-                return <TooltipProvider><Tooltip><TooltipTrigger asChild><XCircle className="size-4 text-red-500" /></TooltipTrigger><TooltipContent><p>Not Explained</p></TooltipContent></Tooltip></TooltipProvider>;
-            default:
-                 return <TooltipProvider><Tooltip><TooltipTrigger asChild><HelpCircle className="size-4 text-muted-foreground" /></TooltipTrigger><TooltipContent><p>Pending Teacher Feedback</p></TooltipContent></Tooltip></TooltipProvider>;
-        }
-    }
-
-    const cardClasses = cn(
-        "bg-card/50 relative group transition-colors",
-        explanation.completionStatus === 'explained' && 'bg-green-500/10 border-green-500/50',
-        explanation.completionStatus === 'not-explained' && 'bg-red-500/10 border-red-500/50'
-    );
-
 
     return (
-        <Card className={cardClasses}>
+        <Card className="bg-card/50 relative group">
              <div className="absolute top-2 right-2 flex items-center gap-2">
-                {explanation.status === 'Finished' && <CompletionStatusIcon />}
-
                 {explanation.status === 'Upcoming' 
-                    ? <Badge variant="outline" className="border-green-500 text-green-500"><Check className="mr-1 h-3 w-3"/> Upcoming</Badge>
-                    : <Badge variant="outline"><Clock className="mr-1 h-3 w-3"/> Finished</Badge>
+                    ? <Badge variant="outline">Upcoming</Badge>
+                    : <Badge variant="secondary">Finished</Badge>
                 }
                 
                 {canDelete && (
@@ -210,11 +184,11 @@ function ExplanationCard({
                 <ContributorList contributors={explanation.contributors} />
                 {isTeacher && explanation.status === 'Finished' && !isReviewed && (
                     <div className="flex items-center justify-end gap-2 pt-2 border-t mt-3">
-                        <span className="text-xs text-muted-foreground">Was it explained?</span>
-                        <Button size="icon" variant="outline" className="h-7 w-7 hover:bg-green-100 dark:hover:bg-green-900" onClick={() => handleCompletionStatus('explained')}>
+                        <span className="text-xs text-muted-foreground">Mark as explained?</span>
+                        <Button size="icon" variant="outline" className="h-7 w-7" onClick={() => handleCompletionStatus('explained')}>
                             <Check className="size-4 text-green-600" />
                         </Button>
-                        <Button size="icon" variant="outline" className="h-7 w-7 hover:bg-red-100 dark:hover:bg-red-900" onClick={() => handleCompletionStatus('not-explained')}>
+                        <Button size="icon" variant="outline" className="h-7 w-7" onClick={() => handleCompletionStatus('not-explained')}>
                             <X className="size-4 text-red-600" />
                         </Button>
                     </div>
