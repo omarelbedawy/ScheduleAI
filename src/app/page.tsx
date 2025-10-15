@@ -1,3 +1,4 @@
+
 'use client';
 
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
@@ -5,8 +6,15 @@ import { Button } from "@/components/ui/button";
 import { ArrowRight, BookOpen, User, Briefcase, Shield, Users } from "lucide-react";
 import Link from "next/link";
 import { motion } from "framer-motion";
+import { useState, useEffect } from "react";
 
 export default function LandingPage() {
+  const [year, setYear] = useState(new Date().getFullYear());
+
+  useEffect(() => {
+    setYear(new Date().getFullYear());
+  }, []);
+
   return (
     <div className="flex flex-col min-h-screen bg-background">
       <header className="container mx-auto px-4 sm:px-6 lg:px-8">
@@ -164,7 +172,7 @@ export default function LandingPage() {
 
        <footer className="border-t">
         <div className="container mx-auto py-6 px-4 sm:px-6 lg:px-8 text-center text-muted-foreground">
-          <p>&copy; {new Date().getFullYear()} STS (Self Teaching STEMer). All rights reserved.</p>
+          <p>&copy; {year} STS (Self Teaching STEMer). All rights reserved.</p>
         </div>
       </footer>
     </div>

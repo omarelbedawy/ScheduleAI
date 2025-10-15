@@ -269,11 +269,6 @@ export function ScheduleAnalyzer() {
   }
 
   const handleNewUpload = () => {
-    if (previewUrl) URL.revokeObjectURL(previewUrl);
-    setFile(null);
-    setPreviewUrl(null);
-    setIsEditing(false);
-    setEditableSchedule([]);
     setState("idle");
   };
 
@@ -415,7 +410,13 @@ function ResultState({ user, classroomId, classroomSchedule, editableSchedule, c
   schoolName: string;
   onNewUpload: () => void;
 }) {
-  const lastUpdated = classroomSchedule?.updatedAt?.toDate().toLocaleString();
+  const [lastUpdated, setLastUpdated] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (classroomSchedule?.updatedAt) {
+      setLastUpdated(classroomSchedule.updatedAt.toDate().toLocaleString());
+    }
+  }, [classroomSchedule?.updatedAt]);
 
   return (
     <div className="space-y-8">
@@ -425,7 +426,7 @@ function ResultState({ user, classroomId, classroomSchedule, editableSchedule, c
           <div>
             <CardTitle>Schedule for {schoolName}</CardTitle>
             <CardDescription>
-              {isEditing ? 'Click on a cell to edit the subject.' : `Last updated by ${classroomSchedule?.lastUpdatedBy || 'N/A'} on ${lastUpdated || 'N/A'}`}
+              {isEditing ? 'Click on a cell to edit the subject.' : `Last updated by ${classroomSchedule?.lastUpdatedBy || 'N/A'}${lastUpdated ? ` on ${lastUpdated}`: ''}`}
             </CardDescription>
           </div>
           <div className="flex flex-wrap gap-2">

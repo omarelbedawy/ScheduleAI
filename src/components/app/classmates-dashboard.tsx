@@ -23,6 +23,7 @@ import { useFirestore } from "@/firebase";
 import { doc, deleteDoc, updateDoc } from "firebase/firestore";
 import { useToast } from "@/hooks/use-toast";
 import { format, formatDistanceToNow } from 'date-fns';
+import { useState, useEffect } from "react";
 
 function getInitials(name: string) {
     if (!name) return '';
@@ -65,6 +66,22 @@ function ExplanationCard({
 }) {
     const firestore = useFirestore();
     const { toast } = useToast();
+    const [timeAgo, setTimeAgo] = useState('a while ago');
+    const [fullDate, setFullDate] = useState('');
+
+    useEffect(() => {
+        const createdAtDate = explanation.createdAt?.toDate();
+        if (createdAtDate) {
+            setTimeAgo(formatDistanceToNow(createdAtDate, { addSuffix: true }));
+        }
+
+        const explanationDate = explanation.explanationDate?.toDate();
+        if (explanationDate) {
+            setFullDate(format(explanationDate, 'EEEE, MMMM d'));
+        } else {
+            setFullDate(explanation.day.charAt(0).toUpperCase() + explanation.day.slice(1));
+        }
+    }, [explanation.createdAt, explanation.explanationDate, explanation.day]);
 
     const isOwner = currentUser?.uid === explanation.ownerId;
     const isTeacher = currentUser?.role === 'teacher';
@@ -72,13 +89,6 @@ function ExplanationCard({
     const isReviewed = explanation.completionStatus === 'explained' || explanation.completionStatus === 'not-explained';
     
     const canDelete = (isAdmin || isOwner);
-
-
-    const createdAtDate = explanation.createdAt?.toDate();
-    const timeAgo = createdAtDate ? formatDistanceToNow(createdAtDate, { addSuffix: true }) : 'a while ago';
-    
-    const explanationDate = explanation.explanationDate?.toDate();
-    const fullDate = explanationDate ? format(explanationDate, 'EEEE, MMMM d') : explanation.day.charAt(0).toUpperCase() + explanation.day.slice(1);
 
     const loText = explanation.learningOutcome ? ` - LO ${explanation.learningOutcome}` : '';
 
@@ -167,7 +177,7 @@ function ExplanationCard({
                 <div className="space-y-1">
                     <CardDescription className="flex items-center gap-2 text-xs">
                         <CalendarDays className="size-4" />
-                        Session {explanation.session} on {fullDate}
+                        Session {explanation.session} on {fullDate || <Skeleton className="h-3 w-24 inline-block" />}
                     </CardDescription>
                      <CardDescription className="flex items-center gap-2 text-xs">
                         <Clock className="size-4" />
