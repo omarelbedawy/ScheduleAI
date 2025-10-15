@@ -184,10 +184,10 @@ export function ScheduleAnalyzer() {
           updatedAt: serverTimestamp(),
         };
 
-        setDoc(classroomDocRef, newScheduleData, { merge: true }).catch(async (serverError) => {
+        setDoc(classroomDocRef, newScheduleData).catch(async (serverError) => {
           const permissionError = new FirestorePermissionError({
             path: classroomDocRef.path,
-            operation: 'update',
+            operation: 'write',
             requestResourceData: newScheduleData,
           } satisfies SecurityRuleContext);
           errorEmitter.emit('permission-error', permissionError);
@@ -410,13 +410,9 @@ function ResultState({ user, classroomId, classroomSchedule, editableSchedule, c
   schoolName: string;
   onNewUpload: () => void;
 }) {
-  const [lastUpdated, setLastUpdated] = useState<string | null>(null);
-
-  useEffect(() => {
-    if (classroomSchedule?.updatedAt) {
-      setLastUpdated(classroomSchedule.updatedAt.toDate().toLocaleString());
-    }
-  }, [classroomSchedule?.updatedAt]);
+  const lastUpdated = classroomSchedule?.updatedAt
+    ? classroomSchedule.updatedAt.toDate().toLocaleString()
+    : null;
 
   return (
     <div className="space-y-8">

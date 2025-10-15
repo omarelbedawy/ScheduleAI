@@ -23,7 +23,6 @@ import { useFirestore } from "@/firebase";
 import { doc, deleteDoc, updateDoc } from "firebase/firestore";
 import { useToast } from "@/hooks/use-toast";
 import { format, formatDistanceToNow } from 'date-fns';
-import { useState, useEffect } from "react";
 
 function getInitials(name: string) {
     if (!name) return '';
@@ -66,23 +65,15 @@ function ExplanationCard({
 }) {
     const firestore = useFirestore();
     const { toast } = useToast();
-    const [timeAgo, setTimeAgo] = useState('a while ago');
-    const [fullDate, setFullDate] = useState('');
+    
+    const createdAtDate = explanation.createdAt?.toDate();
+    const timeAgo = createdAtDate
+      ? formatDistanceToNow(createdAtDate, { addSuffix: true })
+      : "a while ago";
 
-    useEffect(() => {
-        const createdAtDate = explanation.createdAt?.toDate();
-        if (createdAtDate) {
-            setTimeAgo(formatDistanceToNow(createdAtDate, { addSuffix: true }));
-        }
-
-        const explanationDate = explanation.explanationDate?.toDate();
-        if (explanationDate) {
-            setFullDate(format(explanationDate, 'EEEE, MMMM d'));
-        } else {
-            setFullDate(explanation.day.charAt(0).toUpperCase() + explanation.day.slice(1));
-        }
-    }, [explanation.createdAt, explanation.explanationDate, explanation.day]);
-
+    const explanationDate = explanation.explanationDate?.toDate();
+    const fullDate = explanationDate ? format(explanationDate, 'EEEE, MMMM d') : (explanation.day.charAt(0).toUpperCase() + explanation.day.slice(1));
+    
     const isOwner = currentUser?.uid === explanation.ownerId;
     const isTeacher = currentUser?.role === 'teacher';
     const isAdmin = currentUser?.role === 'admin';

@@ -6,14 +6,9 @@ import { Button } from "@/components/ui/button";
 import { ArrowRight, BookOpen, User, Briefcase, Shield, Users } from "lucide-react";
 import Link from "next/link";
 import { motion } from "framer-motion";
-import { useState, useEffect } from "react";
 
 export default function LandingPage() {
-  const [year, setYear] = useState(new Date().getFullYear());
-
-  useEffect(() => {
-    setYear(new Date().getFullYear());
-  }, []);
+  const year = new Date().getFullYear();
 
   return (
     <div className="flex flex-col min-h-screen bg-background">
